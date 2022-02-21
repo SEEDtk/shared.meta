@@ -555,6 +555,15 @@ public class MetaModel {
     }
 
     /**
+     * @return TRUE if the specified feature triggers a reaction
+     *
+     * @param fid	ID of the feature of interest
+     */
+    public boolean triggers(String fid) {
+        return this.reactionMap.containsKey(fid);
+    }
+
+    /**
      * @return the reaction map for this model
      */
     public Map<String, Set<Reaction>> getReactionMap() {
