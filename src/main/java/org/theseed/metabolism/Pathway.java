@@ -21,6 +21,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
+import org.theseed.counters.CountMap;
 import org.theseed.utils.ParseFailureException;
 
 import com.github.cliftonlabs.json_simple.JsonArray;
@@ -86,17 +87,21 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         private String output;
         /** reaction at this point in the pathway */
         private Reaction reaction;
+        /** sequence number of reaction */
+        private int seqNum;
 
         /**
          * Create a new element for a pathway.
          *
          * @param reaction	reaction to use
          * @param node		desired output node
+         * @param num 		sequence number of reaction
          */
-        public Element(Reaction reaction, Reaction.Stoich node) {
+        private Element(Reaction reaction, Reaction.Stoich node, int num) {
             this.reaction = reaction;
             this.output = node.getMetabolite();
             this.reversed = ! node.isProduct();
+            this.seqNum = num;
         }
 
         /**
@@ -107,7 +112,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
          *
          * @throws ParseFailureException
          */
-        public Element(JsonObject json, MetaModel model) throws ParseFailureException {
+        private Element(JsonObject json, MetaModel model) throws ParseFailureException {
             JsonObject reactionO = (JsonObject) json.get("reaction");
             String reactionId = reactionO.getStringOrDefault(Reaction.ReactionKeys.BIGG_ID);
             this.reaction = model.getReaction(reactionId);
@@ -231,6 +236,21 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             return true;
         }
 
+        /**
+         * @return the sequence number
+         */
+        public int getSeqNum() {
+            return this.seqNum;
+        }
+
+        /**
+         * Specify the sequence number.
+         * @param seqNum 	the sequence number to set
+         */
+        protected void setSeqNum(int seqNum) {
+            this.seqNum = seqNum;
+        }
+
     }
 
     /**
@@ -323,6 +343,8 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             JsonObject elementO = (JsonObject) obj;
             Element element = new Element(elementO, model);
             this.elements.add(element);
+            // We must set the sequence number manually-- the numbers are 1-based.
+            element.setSeqNum(this.elements.size());
         }
     }
 
@@ -333,7 +355,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      * @param node		stoichiometric element indicating the output
      */
     public Pathway add(Reaction reaction, Reaction.Stoich node) {
-        Element element = new Element(reaction, node);
+        Element element = new Element(reaction, node, this.elements.size() + 1);
         this.elements.add(element);
         return this;
     }
@@ -597,6 +619,38 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         try (PrintWriter writer = new PrintWriter(outFile)) {
             writer.println(Jsoner.prettyPrint(jsonString));
         }
+    }
+
+    /**
+     * Compute the set of inputs for this pathway.  An input is a compound that does not appear on
+     * the output side of any reaction and that is not uncommon.
+     *
+     * @param model		model containing this pathway
+     *
+     * @return a map containing the number of each input metabolite required
+     */
+    public CountMap<String> getUncommonInputs(MetaModel model) {
+        Set<String> commons = model.getCommons();
+        CountMap<String> retVal = new CountMap<String>();
+        Set<String> outputs = new TreeSet<String>();
+        for (Element element : this.elements) {
+            Reaction reaction = element.getReaction();
+            boolean mode = element.isReversed();
+            for (Reaction.Stoich stoich : reaction.getMetabolites()) {
+                String metabolite = stoich.getMetabolite();
+                // Note we only process the uncommon compounds.
+                if (! commons.contains(metabolite)) {
+                    if (mode == stoich.isProduct())
+                        retVal.count(stoich.getMetabolite(), stoich.getCoeff());
+                    else
+                        outputs.add(stoich.getMetabolite());
+                }
+            }
+        }
+        // Now we must erase the metabolites that are also outputs.
+        outputs.stream().forEach(x -> retVal.remove(x));
+        // Return the remaining counts.
+        return retVal;
     }
 
 }

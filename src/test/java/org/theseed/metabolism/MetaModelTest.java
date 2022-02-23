@@ -127,6 +127,9 @@ public class MetaModelTest {
         Set<String> triggers = testReact.getTriggers();
         assertThat(triggers, contains("b3731", "b3732", "b3733", "b3734", "b3735",
                 "b3736", "b3737", "b3738", "b3739"));
+        String rule = testReact.getReactionRule();
+        String translatedRule = Reaction.getTranslatedRule(rule, model);
+        assertThat(translatedRule, equalTo("((atpF and atpE and atpB) and (atpC and atpD and atpG and atpA and atpH) and atpI) or ((atpF and atpE and atpB) and (atpC and atpD and atpG and atpA and atpH))"));
     }
 
     @Test

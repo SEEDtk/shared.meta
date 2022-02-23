@@ -24,9 +24,11 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.genome.Genome;
+import org.theseed.metabolism.Reaction.ActiveDirections;
 
 import com.github.cliftonlabs.json_simple.JsonArray;
 import com.github.cliftonlabs.json_simple.JsonException;
@@ -90,8 +92,8 @@ public class MetaModel {
     private static int MAX_PATH_LEN = 100;
     /** set of common compounds */
     private static Set<String> COMMONS = Set.of("h_c", "h_p", "h2o_c", "atp_c", "co2_c",
-            "o2_c", "pi_c", "adp_c", "glu__D_c", "nadh_p", "nadh_c", "nad_c", "nadph_c",
-            "o2_p", "na1_p", "na1_c", "h2o2_c", "h2_c");
+            "o2_c", "pi_c", "adp_c", "glc__D_c", "nadh_p", "nadh_c", "nad_c", "nadph_c",
+            "o2_p", "na1_p", "na1_c", "h2o2_c", "h2_c", "glc__D_e", "glc__D_p");
 
     /**
      * This enum is used to manage the JSON keys used by sub-objects of the model.
@@ -1082,6 +1084,42 @@ public class MetaModel {
                 var idSet = retVal.computeIfAbsent(name, x -> new TreeSet<String>());
                 idSet.add(compound.getBiggId());
             }
+        }
+        return retVal;
+    }
+
+    /**
+     * @return the number of reactions in the model
+     */
+    public int getReactionCount() {
+        return this.reactionMap.size();
+    }
+
+    /**
+     * Reset all flow modifications to the default state,
+     */
+    public void resetFlow() {
+        for (Reaction reaction : this.bReactionMap.values()) {
+            if (reaction.isReversible())
+                reaction.setActive(ActiveDirections.BOTH);
+            else
+                reaction.setActive(ActiveDirections.FORWARD);
+        }
+    }
+
+    /**
+     * @return the gene name for a BiGG ID, or the original ID if there is none
+     *
+     * @param bigg_id	BiGG ID to convert to a gene name
+     */
+    public String geneNameOf(String bigg_id) {
+        String retVal = bigg_id;
+        var fids = this.aliasMap.get(bigg_id);
+        if (fids != null) {
+            Optional<String> name = fids.stream().map(x -> this.baseGenome.getFeature(x).getGeneName())
+                    .filter(x -> ! StringUtils.isBlank(x)).findFirst();
+            if (name.isPresent())
+                retVal = name.get();
         }
         return retVal;
     }

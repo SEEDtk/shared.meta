@@ -10,8 +10,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -57,6 +59,10 @@ public class Reaction implements Comparable<Reaction> {
     private ActiveDirections active;
     /** connectors for reaction rules */
     private static final Set<String> CONNECTORS = Set.of("and", "or", "not");
+    /** delimiters for reaction rules */
+    private static final Pattern DELIMITERS = Pattern.compile("[ ()]+");
+    /** delimiter set for reaction rules */
+    private static final String DELIM_STRING = " ()";
 
     /**
      * This enumeration determines the active directions of a reaction.
@@ -522,13 +528,37 @@ public class Reaction implements Comparable<Reaction> {
      * @return the set of triggering genes for this reaction
      */
     public Set<String> getTriggers() {
-        String[] parts = this.reactionRule.split("[\\s+()]+");
+        String[] parts = DELIMITERS.split(this.reactionRule);
         Set<String> retVal = new TreeSet<String>();
         for (String part : parts) {
             if (! part.isEmpty() && ! CONNECTORS.contains(part.toLowerCase()))
                 retVal.add(part);
         }
         return retVal;
+    }
+
+    /**
+     * @return a reaction rule with the gene IDs translated to gene names
+     *
+     * @param rule		reaction rule to translate
+     * @param model		metabolic model containing the reaction
+     */
+    public static String getTranslatedRule(String rule, MetaModel model) {
+        StringBuilder retVal = new StringBuilder(rule.length() + 20);
+        // Tokenize the string.  Note we return delimiters as well as words.
+        var tokenizer = new StringTokenizer(rule, DELIM_STRING, true);
+        while (tokenizer.hasMoreTokens()) {
+            String token = tokenizer.nextToken();
+            if (DELIM_STRING.contains(token) || CONNECTORS.contains(token.toLowerCase())) {
+                // Delimiters and connectors are copied unchanged.
+                retVal.append(token);
+            } else {
+                // Here we have a trigger ID.
+                String name = model.geneNameOf(token);
+                retVal.append(name);
+            }
+        }
+        return retVal.toString();
     }
 
     /**

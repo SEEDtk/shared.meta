@@ -201,14 +201,16 @@ public class ModifierList {
      * Process a metabolic model and update the active directions for all of its reactions.
      *
      * @param model		metabolic model to update
+     *
+     * @return the number of modifications made
      */
-    public void apply(MetaModel model) {
+    public int apply(MetaModel model) {
+        int retVal = 0;
         int flowCount = this.modifiers.size();
         if (flowCount == 0)
             log.info("No flow modifiers to apply.");
         else {
             // This will count the number of modifications made.
-            int modCount = 0;
             int rCount = 0;
             // Loop through the reactions.
             for (Reaction reaction : model.getAllReactions()) {
@@ -218,10 +220,11 @@ public class ModifierList {
                 // Apply each flow modifier to this reaction.
                 this.modifiers.stream().forEach(x -> x.getValue().setActiveDirections(reaction));
                 if (reaction.getActive() != oldActive)
-                    modCount++;
+                    retVal++;
             }
-            log.info("{} of {} reactions affected by {} flow modifiers.", modCount, rCount, this.modifiers.size());
+            log.info("{} of {} reactions affected by {} flow modifiers.", retVal, rCount, this.modifiers.size());
         }
+        return retVal;
     }
 
     @Override
