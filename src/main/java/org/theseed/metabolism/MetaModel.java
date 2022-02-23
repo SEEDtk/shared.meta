@@ -80,20 +80,25 @@ public class MetaModel {
     private List<Reaction> duplicates;
     /** last ID used */
     private int lastId;
-    /** return value when no reactions found */
-    private static Set<Reaction> NO_REACTIONS = Collections.emptySet();
-    /** return value when no metabolite nodes are found */
-    private List<ModelNode.Metabolite> NO_METABOLITES = Collections.emptyList();
     /** map of aliases to FIG IDs */
     private Map<String, Set<String>> aliasMap;
     /** maximum number of successor reactions for a compound to be considered common */
     private static int MAX_SUCCESSORS = 20;
     /** maximum pathway length */
     private static int MAX_PATH_LEN = 100;
+    /** return value when no reactions found */
+    private static final Set<Reaction> NO_REACTIONS = Collections.emptySet();
+    /** return value when no metabolite nodes are found */
+    private static final List<ModelNode.Metabolite> NO_METABOLITES = Collections.emptyList();
     /** set of common compounds */
-    private static Set<String> COMMONS = Set.of("h_c", "h_p", "h2o_c", "atp_c", "co2_c",
+    private static final Set<String> COMMONS = Set.of("h_c", "h_p", "h2o_c", "atp_c", "co2_c",
             "o2_c", "pi_c", "adp_c", "glc__D_c", "nadh_p", "nadh_c", "nad_c", "nadph_c",
-            "o2_p", "na1_p", "na1_c", "h2o2_c", "h2_c", "glc__D_e", "glc__D_p");
+            "o2_p", "na1_p", "na1_c", "h2o2_c", "h2_c", "glc__D_e", "glc__D_p", "ppi_c");
+    /** empty set of IDs */
+    private static final Set<String> NO_FIDS = Collections.emptySet();
+    /** compartment names for compound IDs */
+    private static final Map<String, String> COMPARTMENTS = Map.of("c", " [cytoplasm]", "p", " [periplasm]", "e",
+            " [external]");
 
     /**
      * This enum is used to manage the JSON keys used by sub-objects of the model.
@@ -1120,6 +1125,35 @@ public class MetaModel {
                     .filter(x -> ! StringUtils.isBlank(x)).findFirst();
             if (name.isPresent())
                 retVal = name.get();
+        }
+        return retVal;
+    }
+
+    /**
+     * @return the set of feature IDs for a BiGG ID
+     *
+     * @param bigg_id	BiGG ID to convert to a feature ID
+     */
+    public Set<String> fidsOf(String bigg_id) {
+        return this.aliasMap.getOrDefault(bigg_id, NO_FIDS);
+    }
+
+    /**
+     * @return the name of the compound with the specified BiGG ID
+     *
+     * @param bigg_id	ID of the compound whose name is desired
+     */
+    public String getCompoundName(String bigg_id) {
+        String retVal;
+        var nodes = this.metaboliteMap.get(bigg_id);
+        if (nodes == null || nodes.isEmpty())
+            retVal = "Unknown compound " + bigg_id;
+        else {
+            // We compute the compartment from the last character of the ID.
+            String compartment = COMPARTMENTS.getOrDefault(bigg_id.substring(bigg_id.length() - 1), "");
+            // The full name is the name in the first node (all nodes will have the same name) plus the
+            // compartment.
+            retVal = nodes.get(0).getName() + compartment;
         }
         return retVal;
     }

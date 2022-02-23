@@ -86,6 +86,12 @@ public class ModifierList {
             public FlowModifier create(String line) {
                 return new ReactionSuppressModifier(line);
             }
+        },
+        ONEWAY {
+            @Override
+            public FlowModifier create(String line) {
+                return new OneWayModifier(line);
+            }
         };
 
         /**

@@ -265,6 +265,9 @@ public class MetaModelTest {
         var cMap = model.getCompoundMap();
         var sugars = cMap.get("D-Glucose");
         assertThat(sugars, containsInAnyOrder("glc__D_p", "glc__D_e", "glc__D_c"));
+        assertThat(model.getCompoundName("glc__D_p"), equalTo("D-Glucose [periplasm]"));
+        assertThat(model.getCompoundName("glc__D_e"), equalTo("D-Glucose [external]"));
+        assertThat(model.getCompoundName("glc__D_c"), equalTo("D-Glucose [cytoplasm]"));
     }
 
 }

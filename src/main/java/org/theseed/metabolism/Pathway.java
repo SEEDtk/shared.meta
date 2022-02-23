@@ -479,9 +479,11 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     }
 
     /**
-     * @return a count map for the number of branches off of each intermediate node in the pathway
+     * Find the branches off each intermediate node in the pathway.
      *
      * @param model		the model in which the pathway occurs
+     *
+     * @return a map from each intermediate compound to the set of branching reactions
      */
     public Map<String, Set<Reaction>> getBranches(MetaModel model) {
         var retVal = new HashMap<String, Set<Reaction>>(this.size() * 4 / 3);
