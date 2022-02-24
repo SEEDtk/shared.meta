@@ -58,7 +58,7 @@ public class ModelPathMap {
             for (Reaction successor : successors) {
                 var outputs = successor.getOutputs(compound);
                 for (Reaction.Stoich node : outputs) {
-                    this.record(queue, subMap, new Pathway(successor, node), compounds);
+                    this.record(queue, subMap, new Pathway(compound, successor, node), compounds);
                     pathCount++;
                 }
             }

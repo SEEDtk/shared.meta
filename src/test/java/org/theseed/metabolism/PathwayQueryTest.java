@@ -45,11 +45,11 @@ public class PathwayQueryTest {
         validatePath(path4, "icit_c", "mal__L_c");
         checkReactions(path4, "CITL");
         // Test query 4: A to A via B.  This involves extending path1 back to A.
-        path2 = model.loopPathway(path1, "succ_c");
+        path2 = model.loopPathway(path1);
         validatePath(path2, "succ_c", "succ_c");
         checkInclude(path2, "icit_c");
         // Test query 5: A to A via B avoiding C.  This involves extending path3 back to A.
-        path3 = model.loopPathway(path3, "icit_c", new AvoidPathwayFilter("glx_c"));
+        path3 = model.loopPathway(path3, new AvoidPathwayFilter("glx_c"));
         validatePath(path3, "icit_c", "icit_c");
         checkInclude(path3, "mal__L_c");
         checkAvoid(path3, "glx_c");

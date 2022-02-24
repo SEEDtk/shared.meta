@@ -46,12 +46,16 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     private List<Element> elements;
     /** pathway goal compound */
     private String goal;
+    /** pathway start compound */
+    private String input;
+    /** empty element list for Json */
+    private static final JsonArray EMPTY_ARRAY = new JsonArray();
 
     /**
      * This enum defines the JSON keys we use.
      */
     private static enum PathwayKeys implements JsonKey {
-        REVERSED(false), OUTPUT("");
+        REVERSED(false), OUTPUT(null), INPUT(null), ELEMENTS(EMPTY_ARRAY);
 
         private final Object m_value;
 
@@ -254,19 +258,24 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     }
 
     /**
-     * Construct an empty pathway.
+     * Construct an empty pathway with a specified input.
+     *
+     * @param input		BiGG ID of the input compound
      */
-    public Pathway() {
+    public Pathway(String input) {
         this.elements = new ArrayList<Element>();
+        this.input = input;
     }
 
     /**
      * Construct a pathway from a single reaction element.
      *
+     * @param input		input compound for the pathway
      * @param reaction	first reaction in pathway
      * @param stoich	stoichiometric element for computing output
      */
-    public Pathway(Reaction reaction, Reaction.Stoich node) {
+    public Pathway(String input, Reaction reaction, Reaction.Stoich node) {
+        this.input = input;
         this.elements = new ArrayList<Element>();
         add(reaction, node);
     }
@@ -279,7 +288,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      *
      * @throws ParseFailureException
      */
-    public Pathway(JsonArray json, MetaModel model) throws ParseFailureException {
+    public Pathway(JsonObject json, MetaModel model) throws ParseFailureException {
         this.fromJson(json, model);
     }
 
@@ -292,7 +301,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      * @throws ParseFailureException
      */
     public Pathway(String jsonString, MetaModel model) throws ParseFailureException {
-        JsonArray json = Jsoner.deserialize(jsonString, (JsonArray) null);
+        JsonObject json = Jsoner.deserialize(jsonString, (JsonObject) null);
         if (json == null)
             throw new ParseFailureException("Cannot deserialize JSON string \"" + StringUtils.abbreviate(jsonString, 30)
                     + "\".");
@@ -311,7 +320,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      */
     public Pathway(File inFile, MetaModel model) throws ParseFailureException, JsonException, IOException {
         try (Reader reader = new FileReader(inFile)) {
-            JsonArray json = (JsonArray) Jsoner.deserialize(reader);
+            JsonObject json = (JsonObject) Jsoner.deserialize(reader);
             this.fromJson(json, model);
         }
     }
@@ -319,11 +328,13 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     /**
      * Construct a pathway from a single reaction element and specify a goal
      *
+     * @param input		input compound
      * @param reaction	first reaction in pathway
      * @param stoich	stoichiometric element for computing output
      * @param goal		target output compound
      */
-    public Pathway(Reaction reaction, Reaction.Stoich node, String goal) {
+    public Pathway(String input, Reaction reaction, Reaction.Stoich node, String goal) {
+        this.input = input;
         this.elements = new ArrayList<Element>();
         add(reaction, node);
         this.goal = goal;
@@ -337,9 +348,11 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      *
      * @throws ParseFailureException
      */
-    private void fromJson(JsonArray json, MetaModel model) throws ParseFailureException {
-        this.elements = new ArrayList<Element>(json.size());
-        for (Object obj : json) {
+    private void fromJson(JsonObject json, MetaModel model) throws ParseFailureException {
+        this.input = json.getStringOrDefault(PathwayKeys.INPUT);
+        JsonArray pathJson = json.getCollectionOrDefault(PathwayKeys.ELEMENTS);
+        this.elements = new ArrayList<Element>(pathJson.size());
+        for (Object obj : pathJson) {
             JsonObject elementO = (JsonObject) obj;
             Element element = new Element(elementO, model);
             this.elements.add(element);
@@ -374,7 +387,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      * @return a copy of this pathway.
      */
     public Pathway clone() {
-        Pathway retVal = new Pathway();
+        Pathway retVal = new Pathway(this.input);
         this.elements.stream().forEach(x -> retVal.elements.add(x));
         retVal.goal = this.goal;
         return retVal;
@@ -392,24 +405,30 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      * Attempt to reverse this pathway.  If the pathway is not reversible, an IllegalArgumentException
      * will be thrown.
      *
-     * @param output	proposed new output
-     *
      * @return the reverse of this pathway
      *
      */
-    public Pathway reverse(String output) {
-        // Create the new pathway.
-        Pathway retVal = new Pathway();
-        // Compute the new outputs for each reaction.
-        String[] outputs = new String[this.size()];
-        outputs[0] = output;
-        final int n = this.size() - 1;
-        for (int i = 1; i <= n; i++)
-            outputs[i] = this.getElement(i-1).output;
-        // Now assembly the reactions in reverse order.
-        for (int i = n; i >= 0; i--) {
-            Element reversed = new Element(this.getElement(i), outputs[i]);
-            retVal.elements.add(reversed);
+    public Pathway reverse() {
+        // Only bother if this pathway has elements.
+        Pathway retVal;
+        if (this.elements.size() <= 0) {
+            retVal = new Pathway(this.goal);
+            retVal.goal = this.input;
+        } else {
+            // Create the new pathway.
+            Element lastElement = this.getLast();
+            retVal = new Pathway(lastElement.output);
+            // Compute the new outputs for each reaction.
+            String[] outputs = new String[this.size()];
+            outputs[0] = this.input;
+            final int n = this.size() - 1;
+            for (int i = 1; i <= n; i++)
+                outputs[i] = this.getElement(i-1).output;
+            // Now assemble the reactions in reverse order.
+            for (int i = n; i >= 0; i--) {
+                Element reversed = new Element(this.getElement(i), outputs[i]);
+                retVal.elements.add(reversed);
+            }
         }
         return retVal;
     }
@@ -573,10 +592,11 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     /**
      * @return a JSON representation of this pathway
      */
-    public JsonArray toJson() {
-        JsonArray retVal = new JsonArray();
+    public JsonObject toJson() {
+        JsonArray elementJson = new JsonArray();
         for (Element element : this)
-            retVal.add(element.toJson());
+            elementJson.add(element.toJson());
+        JsonObject retVal = new JsonObject().putChain("input", this.input).putChain("elements", elementJson);
         return retVal;
     }
 
@@ -602,11 +622,10 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      * @return a pathway formed by looping this one back to a starting compound
      *
      * @param model		parent model of the pathway
-     * @param bigg2		BiGG ID of the starting compound
      * @param filters	filters to apply
      */
-    public Pathway loop(MetaModel model, String bigg2, PathwayFilter... filters) {
-        return model.loopPathway(this, bigg2, filters);
+    public Pathway loop(MetaModel model, PathwayFilter... filters) {
+        return model.loopPathway(this, filters);
     }
 
     /**
@@ -653,6 +672,13 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         outputs.stream().forEach(x -> retVal.remove(x));
         // Return the remaining counts.
         return retVal;
+    }
+
+    /**
+     * @return the input compound for this path
+     */
+    public String getInput() {
+        return this.input;
     }
 
 }

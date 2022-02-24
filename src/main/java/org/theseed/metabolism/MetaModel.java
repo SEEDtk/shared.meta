@@ -765,7 +765,7 @@ public class MetaModel {
             for (Reaction starter : starters) {
                 var outputs = starter.getOutputs(bigg1);
                 for (Reaction.Stoich node : outputs)
-                    initial.add(new Pathway(starter, node, bigg2));
+                    initial.add(new Pathway(bigg1, starter, node, bigg2));
             }
             retVal = this.findPathway(initial, filters);
         }
@@ -791,22 +791,21 @@ public class MetaModel {
      * reversible, however, we have to search from both ends of the pathway.
      *
      * @param path1		pathway to loop
-     * @param origin	target compound to loop back to
      * @param filters	pathway filters to use
      *
      * @return			a looped pathway fulfilling the terms of the filter
      */
-    public Pathway loopPathway(Pathway path1, String origin, PathwayFilter... filters) {
+    public Pathway loopPathway(Pathway path1, PathwayFilter... filters) {
         List<Pathway> starters = new ArrayList<Pathway>(2);
         if (path1.isReversible()) {
             // Reverse the pathway and set a goal to get back to the old output.
             String oldOutput = path1.getLast().getOutput();
-            Pathway path2 = path1.reverse(origin);
+            Pathway path2 = path1.reverse();
             path2.setGoal(oldOutput);
             starters.add(path2);
         }
         // Set a goal to extend the pathway back to the origin.
-        path1.setGoal(origin);
+        path1.setGoal(path1.getInput());
         starters.add(path1);
         return this.findPathway(starters, filters);
     }

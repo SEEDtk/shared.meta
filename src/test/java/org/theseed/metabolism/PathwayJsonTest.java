@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.theseed.genome.Genome;
 import org.theseed.utils.ParseFailureException;
 
-import com.github.cliftonlabs.json_simple.JsonArray;
 import com.github.cliftonlabs.json_simple.JsonException;
+import com.github.cliftonlabs.json_simple.JsonObject;
 
 /**
  * @author Bruce Parrello
@@ -31,7 +31,7 @@ public class PathwayJsonTest {
         acontA.setActive(Reaction.ActiveDirections.FORWARD);
         model.buildReactionNetwork();
         Pathway path1 = model.getPathway("icit_c", "cit_c");
-        JsonArray pathJson = path1.toJson();
+        JsonObject pathJson = path1.toJson();
         Pathway path2 = new Pathway(pathJson, model);
         this.comparePaths("From Json", path1, path2);
         String pathString = path1.toJsonString();
@@ -52,6 +52,7 @@ public class PathwayJsonTest {
      */
     private void comparePaths(String string, Pathway path1, Pathway path2) {
         assertThat(string, path1.size(), equalTo(path2.size()));
+        assertThat(string, path1.getInput(), equalTo(path2.getInput()));
         for (int i = 0; i < path1.size(); i++) {
             var elt1 = path1.getElement(i);
             var elt2 = path2.getElement(i);
