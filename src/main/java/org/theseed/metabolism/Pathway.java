@@ -10,6 +10,7 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -50,6 +51,8 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     private String input;
     /** empty element list for Json */
     private static final JsonArray EMPTY_ARRAY = new JsonArray();
+    /** filename extension for pathway files */
+    public static final String FILE_EXT = ".path.json";
 
     /**
      * This enum defines the JSON keys we use.
@@ -253,6 +256,18 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
          */
         protected void setSeqNum(int seqNum) {
             this.seqNum = seqNum;
+        }
+
+    }
+
+    /**
+     * This class implements a filename filter for pathway files.
+     */
+    public static class FileFilter implements java.io.FileFilter {
+
+        @Override
+        public boolean accept(File pathname) {
+            return pathname.getName().endsWith(FILE_EXT);
         }
 
     }
@@ -498,11 +513,11 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     }
 
     /**
-     * Find the branches off each intermediate node in the pathway.
+     * Find the branches off each node in the pathway.
      *
      * @param model		the model in which the pathway occurs
      *
-     * @return a map from each intermediate compound to the set of branching reactions
+     * @return a map from each output compound to the set of branching reactions
      */
     public Map<String, Set<Reaction>> getBranches(MetaModel model) {
         var retVal = new HashMap<String, Set<Reaction>>(this.size() * 4 / 3);
@@ -573,7 +588,19 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
 
     @Override
     public String toString() {
-        return "path[" + this.elements.stream().map(x -> x.toString()).collect(Collectors.joining("-->")) + "]";
+        StringBuffer retVal = new StringBuffer(80);
+        if (this.input == null)
+            retVal.append("X");
+        else
+            retVal.append(this.input);
+        retVal.append(" ==> ");
+        if (this.goal != null)
+            retVal.append(this.goal);
+        else if (this.elements.size() == 0)
+            retVal.append("X");
+        else
+            retVal.append(this.getLast().getOutput());
+        return retVal.toString();
     }
 
     @Override
@@ -643,15 +670,30 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     }
 
     /**
+     * @return the list of outputs for this pathway (in order)
+     */
+    public List<String> getOutputs() {
+        return this.elements.stream().map(x -> x.getOutput()).collect(Collectors.toList());
+    }
+
+
+    /**
      * Compute the set of inputs for this pathway.  An input is a compound that does not appear on
      * the output side of any reaction and that is not uncommon.
      *
-     * @param model		model containing this pathway
+     * @param model			model containing this pathway
+     * @param includeAll	TRUE to include common inputs
      *
      * @return a map containing the number of each input metabolite required
      */
-    public CountMap<String> getUncommonInputs(MetaModel model) {
-        Set<String> commons = model.getCommons();
+    public CountMap<String> getInputs(MetaModel model, boolean includeAll) {
+        // Create the exclude set.
+        Set<String> commons;
+        if (includeAll)
+            commons = Collections.emptySet();
+        else
+            commons = model.getCommons();
+        // Build the count map.
         CountMap<String> retVal = new CountMap<String>();
         Set<String> outputs = new TreeSet<String>();
         for (Element element : this.elements) {
@@ -680,5 +722,6 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     public String getInput() {
         return this.input;
     }
+
 
 }

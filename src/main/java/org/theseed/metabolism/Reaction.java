@@ -434,6 +434,7 @@ public class Reaction implements Comparable<Reaction> {
         this.reversible = false;
         this.segments = new ArrayList<Segment>();
         this.reactionRule = "";
+        this.active = ActiveDirections.FORWARD;
     }
 
     /**
@@ -681,6 +682,7 @@ public class Reaction implements Comparable<Reaction> {
      */
     public void setReversible(boolean reversible2) {
         this.reversible = reversible2;
+        ActiveDirections.setDefault(this);
     }
 
     /**

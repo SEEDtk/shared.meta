@@ -6,10 +6,11 @@ package org.theseed.metabolism;
 import org.junit.jupiter.api.Test;
 import org.theseed.genome.Genome;
 import org.theseed.io.TabbedLineReader;
+import org.theseed.metabolism.Reaction.ActiveDirections;
 import org.theseed.metabolism.mods.FlowModifier;
 import org.theseed.metabolism.mods.ForwardOnlyModifier;
 import org.theseed.metabolism.mods.ModifierList;
-import org.theseed.metabolism.mods.ReactionSuppressModifier;
+import org.theseed.metabolism.mods.ReactionFlowModifier;
 import org.theseed.utils.ParseFailureException;
 
 import com.github.cliftonlabs.json_simple.JsonArray;
@@ -28,9 +29,9 @@ class FlowModifierTests {
 
     @Test
     void testFlowCompare() {
-        FlowModifier mod1 = new ReactionSuppressModifier("AAA BBB");
+        FlowModifier mod1 = new ReactionFlowModifier("AAA BBB", ActiveDirections.NEITHER);
         FlowModifier mod2 = new ForwardOnlyModifier("AAA BBB");
-        FlowModifier mod3 = new ReactionSuppressModifier("BBB AAA");
+        FlowModifier mod3 = new ReactionFlowModifier("BBB AAA", ActiveDirections.NEITHER);
         FlowModifier mod4 = new ForwardOnlyModifier("AAA BBB CCC");
         FlowModifier mod5 = new ForwardOnlyModifier("BBB AAA CCC");
         assertThat(mod1, equalTo(mod3));
@@ -68,6 +69,10 @@ class FlowModifierTests {
         for (Reaction reaction : model.getAllReactions()) {
             if (reaction.getBiggId().equals("PGK"))
                 assertThat(reaction.getActive(), equalTo(Reaction.ActiveDirections.NEITHER));
+            else if (reaction.getBiggId().equals("IDOND") || reaction.getBiggId().equals("ADK1"))
+                assertThat(reaction.getActive(), equalTo(Reaction.ActiveDirections.FORWARD));
+            else if (reaction.getBiggId().equals("NDPK2"))
+                assertThat(reaction.getActive(), equalTo(Reaction.ActiveDirections.REVERSE));
             else {
                 for (Reaction.Stoich stoich : reaction.getMetabolites()) {
                     if (! stoich.isProduct() && compounds.contains(stoich.getMetabolite()))

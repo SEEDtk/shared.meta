@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.metabolism.MetaModel;
 import org.theseed.metabolism.Reaction;
+import org.theseed.metabolism.Reaction.ActiveDirections;
 
 import com.github.cliftonlabs.json_simple.JsonArray;
 import com.github.cliftonlabs.json_simple.JsonKey;
@@ -84,13 +85,19 @@ public class ModifierList {
         }, SUPPRESS {
             @Override
             public FlowModifier create(String line) {
-                return new ReactionSuppressModifier(line);
+                return new ReactionFlowModifier(line, ActiveDirections.NEITHER);
             }
         },
         ONEWAY {
             @Override
             public FlowModifier create(String line) {
-                return new OneWayModifier(line);
+                return new ReactionFlowModifier(line, ActiveDirections.FORWARD);
+            }
+        },
+        INVERTED {
+            @Override
+            public FlowModifier create(String line) {
+                return new ReactionFlowModifier(line, ActiveDirections.REVERSE);
             }
         };
 

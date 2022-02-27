@@ -61,6 +61,16 @@ public abstract class ModelNode implements Comparable<ModelNode> {
     }
 
     /**
+     * Construct the underlying node object from just a node ID.
+     *
+     * @param nodeId			node ID number
+     */
+    protected ModelNode(int nodeId) {
+        this.id = nodeId;
+        this.loc = null;
+    }
+
+    /**
      * Construct a model node from a JSON descriptor.
      *
      * @param nodeId			node ID number
@@ -94,7 +104,7 @@ public abstract class ModelNode implements Comparable<ModelNode> {
          * Construct a metabolite node from the json descriptor.
          *
          * @param nodeId			node ID number
-         * @param jsonObject
+         * @param jsonObject		JSON object describing the compound
          */
         public Metabolite(int nodeId, JsonObject jsonObject) {
             super(nodeId, jsonObject);
@@ -103,6 +113,21 @@ public abstract class ModelNode implements Comparable<ModelNode> {
             this.primaryFlag = jsonObject.getBooleanOrDefault(NodeKeys.NODE_IS_PRIMARY);
             this.labelLoc = new Coordinate(jsonObject.getDoubleOrDefault(NodeKeys.LABEL_X),
                     jsonObject.getDoubleOrDefault(NodeKeys.LABEL_Y));
+        }
+
+        /**
+         * Construct a metabolite node from an ID and name.
+         *
+         * @param nodeId			node ID number
+         * @param biggId			BiGG ID of the metabolite
+         * @param name				name of the metabolite
+         */
+        public Metabolite(int nodeId, String biggId, String name) {
+            super(nodeId);
+            this.bigg_id = biggId;
+            this.name = name;
+            this.primaryFlag = false;
+            this.labelLoc = null;
         }
 
         /**
@@ -128,8 +153,10 @@ public abstract class ModelNode implements Comparable<ModelNode> {
 
         @Override
         protected void toNodeJson(JsonObject nodeJson) {
-            nodeJson.put("label_x", this.labelLoc.getX());
-            nodeJson.put("label_y", this.labelLoc.getY());
+            if (this.labelLoc != null) {
+                nodeJson.put("label_x", this.labelLoc.getX());
+                nodeJson.put("label_y", this.labelLoc.getY());
+            }
             nodeJson.put("bigg_id", this.bigg_id);
             nodeJson.put("name", this.name);
             nodeJson.put("node_is_primary", this.primaryFlag);
@@ -182,8 +209,10 @@ public abstract class ModelNode implements Comparable<ModelNode> {
      */
     public JsonObject toJson() {
         JsonObject retVal = new JsonObject();
-        retVal.put("x", this.loc.getX());
-        retVal.put("y", this.loc.getY());
+        if (this.loc != null) {
+            retVal.put("x", this.loc.getX());
+            retVal.put("y", this.loc.getY());
+        }
         this.toNodeJson(retVal);
         return retVal;
     }

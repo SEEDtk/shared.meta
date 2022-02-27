@@ -389,13 +389,23 @@ public class MetaModel {
             int nodeId = Integer.valueOf(nodeEntry.getKey());
             this.checkId(nodeId);
             ModelNode node = ModelNode.create(nodeId, (JsonObject) nodeEntry.getValue());
-            this.nodeMap.put(nodeId, node);
-            if (node instanceof ModelNode.Metabolite) {
-                ModelNode.Metabolite metaNode = (ModelNode.Metabolite) node;
-                List<ModelNode.Metabolite> metaNodes = this.metaboliteMap.computeIfAbsent(metaNode.getBiggId(),
-                        x -> new ArrayList<ModelNode.Metabolite>());
-                metaNodes.add(metaNode);
-            }
+            this.addNode(node);
+        }
+    }
+
+    /**
+     * Add a new node to the model.
+     *
+     * @param node		node to add
+     */
+    protected void addNode(ModelNode node) {
+        int nodeId = node.getId();
+        this.nodeMap.put(nodeId, node);
+        if (node instanceof ModelNode.Metabolite) {
+            ModelNode.Metabolite metaNode = (ModelNode.Metabolite) node;
+            List<ModelNode.Metabolite> metaNodes = this.metaboliteMap.computeIfAbsent(metaNode.getBiggId(),
+                    x -> new ArrayList<ModelNode.Metabolite>());
+            metaNodes.add(metaNode);
         }
     }
 
@@ -811,11 +821,28 @@ public class MetaModel {
     }
 
     /**
-     * Find a pathway from a particular starting list to a particular compound using a
-     * particular filter.
+     * Find a pathway from a particular starting list using a particular set of filters.
+     * Only one pathway is returned, namely the shortest that extends from one of the pathways
+     * in the list to the specified ending compound.
      *
      * @param initial	initial set of pathways to start from
-     * @param filter	pathway filters to use
+     * @param bigg2		BiGG ID of desired output compound
+     * @param filters	pathway filters to use
+     *
+     * @return the shortest pathway that satisfies all the criteria, or NULL if none
+     * 		   was found
+     */
+    public Pathway findPathway(Collection<Pathway> initial, String bigg2, PathwayFilter... filters) {
+        initial.stream().forEach(x -> x.setGoal(bigg2));
+        return findPathway(initial, filters);
+    }
+    /**
+     * Find a pathway from a particular starting list using a particular set of filters.
+     * Only one pathway is returned, namely the shortest that extends from one of the pathways
+     * in the list to that pathway's goal.
+     *
+     * @param initial	initial set of pathways to start from
+     * @param filters	pathway filters to use
      *
      * @return the shortest pathway that satisfies all the criteria, or NULL if none
      * 		   was found
@@ -1093,10 +1120,10 @@ public class MetaModel {
     }
 
     /**
-     * @return the number of reactions in the model
+     * @return the number of distinct reactions in the model
      */
     public int getReactionCount() {
-        return this.reactionMap.size();
+        return this.bReactionMap.size();
     }
 
     /**

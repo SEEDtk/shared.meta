@@ -1,3 +1,5 @@
 command	parms
 FORWARD	btn_c cbl1_c thmpp_c
 SUPPRESS	PGK
+ONEWAY	IDOND ADK1
+INVERTED	NDPK2
