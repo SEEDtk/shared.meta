@@ -424,11 +424,10 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      *
      */
     public Pathway reverse() {
-        // Only bother if this pathway has elements.
+        // Only bother if this pathway has elements.  A null path reverses to itself.
         Pathway retVal;
         if (this.elements.size() <= 0) {
-            retVal = new Pathway(this.goal);
-            retVal.goal = this.input;
+            retVal = this.clone();
         } else {
             // Create the new pathway.
             Element lastElement = this.getLast();
@@ -539,7 +538,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             }
         }
         // Now, finally, we have the branches for the terminus.
-        String terminus = this.getLast().output;
+        String terminus = this.getOutput();
         var reactions = model.getSuccessors(terminus);
         Set<Reaction> branchSet = retVal.computeIfAbsent(terminus, x -> new TreeSet<Reaction>());
         branchSet.addAll(reactions);
@@ -566,7 +565,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      * @return TRUE if this pathway has reached its goal
      */
     public boolean isComplete() {
-        String terminus = this.getLast().getOutput();
+        String terminus = this.getOutput();
         return terminus.contentEquals(goal);
     }
 
@@ -599,7 +598,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         else if (this.elements.size() == 0)
             retVal.append("X");
         else
-            retVal.append(this.getLast().getOutput());
+            retVal.append(this.getOutput());
         return retVal.toString();
     }
 
@@ -722,6 +721,54 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     public String getInput() {
         return this.input;
     }
+
+    /**
+     * @return the current output metabolite for this path.
+     */
+    public String getOutput() {
+        String retVal;
+        if (this.elements.size() == 0)
+            retVal = this.getInput();
+        else
+            retVal = this.getLast().output;
+        return retVal;
+    }
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((this.elements == null) ? 0 : this.elements.hashCode());
+        result = prime * result + ((this.input == null) ? 0 : this.input.hashCode());
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof Pathway)) {
+            return false;
+        }
+        Pathway other = (Pathway) obj;
+        if (this.elements == null) {
+            if (other.elements != null) {
+                return false;
+            }
+        } else if (!this.elements.equals(other.elements)) {
+            return false;
+        }
+        if (this.input == null) {
+            if (other.input != null) {
+                return false;
+            }
+        } else if (!this.input.equals(other.input)) {
+            return false;
+        }
+        return true;
+    }
+
 
 
 }

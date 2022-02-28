@@ -83,7 +83,7 @@ class FlowModifierTests {
         Pathway path1 = model.getPathway("glu__L_e", "glu__L_p").extend(model, "glu__L_c")
                 .extend(model, "ser__L_c", new IncludePathwayFilter(model, "PSP_L"));
         assertThat(path1.getFirst().getInputs(), hasItem("glu__L_e"));
-        assertThat(path1.getLast().getOutput(), equalTo("ser__L_c"));
+        assertThat(path1.getOutput(), equalTo("ser__L_c"));
         for (Pathway.Element elt : path1) {
             var reaction = elt.getReaction();
             assertThat(reaction.getBiggId(), not(equalTo("PGK")));

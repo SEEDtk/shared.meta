@@ -66,7 +66,7 @@ public class ModelPathMap {
             while (! queue.isEmpty()) {
                 Pathway path = queue.remove();
                 // Extend this path.
-                String terminus = path.getLast().getOutput();
+                String terminus = path.getOutput();
                 // Stop if we have hit a common compound.
                 if (! commons.contains(terminus)) {
                     successors = model.getSuccessors(terminus);
@@ -109,7 +109,7 @@ public class ModelPathMap {
     private void record(PriorityQueue<Pathway> queue, HashMap<String, Pathway> subMap, Pathway pathway,
             Set<String> targets) {
         // Get the pathway terminus.
-        String terminus = pathway.getLast().getOutput();
+        String terminus = pathway.getOutput();
         // Add the pathway to the processing queue and the output map.
         queue.add(pathway);
         subMap.put(terminus, pathway);

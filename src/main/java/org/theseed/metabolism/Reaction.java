@@ -696,6 +696,20 @@ public class Reaction implements Comparable<Reaction> {
     }
 
     /**
+     * @return the stoichiometric node for the specified metabolite
+     *
+     * @param compound		BiGG ID of the relevant metabolite
+     */
+    public Stoich getStoich(String compound) {
+        Optional<Stoich> retVal = this.metabolites.stream().filter(x -> x.getMetabolite().contentEquals(compound))
+                .findFirst();
+        if (retVal.isEmpty())
+            throw new IllegalArgumentException("Could not find compound \"" + compound + "\" in reaction " +
+                    this.biggId + ".");
+        return retVal.get();
+    }
+
+    /**
      * @return a JSON object for this reaction
      */
     public JsonObject toJson() {

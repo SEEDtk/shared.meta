@@ -164,8 +164,8 @@ public class MetaModel {
 
         @Override
         public int compare(Pathway o1, Pathway o2) {
-            var terminus1 = o1.getLast().getOutput();
-            var terminus2 = o2.getLast().getOutput();
+            var terminus1 = o1.getOutput();
+            var terminus2 = o2.getOutput();
             var goalMap1 = this.distanceMaps.get(o1.getGoal());
             var goalMap2 = this.distanceMaps.get(o2.getGoal());
             Integer t1 = goalMap1.getOrDefault(terminus1, Integer.MAX_VALUE) + o1.size();
@@ -809,7 +809,7 @@ public class MetaModel {
         List<Pathway> starters = new ArrayList<Pathway>(2);
         if (path1.isReversible()) {
             // Reverse the pathway and set a goal to get back to the old output.
-            String oldOutput = path1.getLast().getOutput();
+            String oldOutput = path1.getOutput();
             Pathway path2 = path1.reverse();
             path2.setGoal(oldOutput);
             starters.add(path2);
@@ -887,10 +887,8 @@ public class MetaModel {
                 if (Arrays.stream(filters).allMatch(x -> x.isGood(path)))
                     retVal = path;
             } else {
-                // We have to keep going.  Get the last element for this pathway.
-                Pathway.Element terminus = path.getLast();
-                // Get the BiGG ID for the metabolite.
-                String outputId = terminus.getOutput();
+                // Get the BiGG ID for the output of the path.
+                String outputId = path.getOutput();
                 // Get the reactions that use this metabolite.
                 Set<Reaction> successors = this.getSuccessors(outputId);
                 // Finally, get the painting for this path's goal.

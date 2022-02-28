@@ -30,8 +30,11 @@ public class PathwayQueryTest {
         MetaModel model = new MetaModel(mFile, genome);
         // Now we have a full-blown model.  Test query 1:  A to B.
         Pathway path1 = model.getPathway("succ_c", "icit_c");
-        assertThat(path1.getLast().getOutput(), equalTo("icit_c"));
+        assertThat(path1.getOutput(), equalTo("icit_c"));
         validatePath(path1, "succ_c", "icit_c");
+        Pathway path0 = new Pathway("succ_c");
+        Pathway path1a = model.extendPathway(path0, "icit_c");
+        assertThat(path1a, equalTo(path1));
         // Test query 2:  A to C via B.  This involves extending path1 to C.
         Pathway path2 = model.extendPathway(path1, "glu__L_c");
         validatePath(path2, "succ_c", "glu__L_c");

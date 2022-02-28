@@ -42,7 +42,7 @@ public class TestPathMap {
                     String pathName = path.toString();
                     var inputs = path.getFirst().getInputs();
                     assertThat(pathName, inputs, hasItem(source));
-                    var terminus = path.getLast().getOutput();
+                    var terminus = path.getOutput();
                     assertThat(pathName, target, equalTo(terminus));
                     String current = source;
                     for (Pathway.Element element : path) {
