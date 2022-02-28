@@ -41,6 +41,10 @@ public class PathwayJsonTest {
         path1.save(saveFile);
         path2 = new Pathway(saveFile, model);
         this.comparePaths("From File", path1, path2);
+        path1 = new Pathway("glc__D_c");
+        path1.save(saveFile);
+        path2 = new Pathway(saveFile, model);
+        this.comparePaths("null save", path1, path2);
     }
 
     /**
