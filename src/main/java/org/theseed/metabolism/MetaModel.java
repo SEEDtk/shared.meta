@@ -82,6 +82,8 @@ public class MetaModel {
     private int lastId;
     /** map of aliases to FIG IDs */
     private Map<String, Set<String>> aliasMap;
+    /** current list of common compounds */
+    private Set<String> commons;
     /** maximum number of successor reactions for a compound to be considered common */
     private static int MAX_SUCCESSORS = 20;
     /** maximum pathway length */
@@ -90,10 +92,10 @@ public class MetaModel {
     private static final Set<Reaction> NO_REACTIONS = Collections.emptySet();
     /** return value when no metabolite nodes are found */
     private static final List<ModelNode.Metabolite> NO_METABOLITES = Collections.emptyList();
-    /** set of common compounds */
-    private static final Set<String> COMMONS = Set.of("h_c", "h_p", "h2o_c", "atp_c", "co2_c",
-            "o2_c", "pi_c", "adp_c", "glc__D_c", "nadh_p", "nadh_c", "nad_c", "nadph_c",
-            "o2_p", "na1_p", "na1_c", "h2o2_c", "h2_c", "glc__D_e", "glc__D_p", "ppi_c");
+    /** default set of common compounds */
+    private static final Set<String> DEFAULT_COMMONS = Set.of("h_c", "h_p", "h2o_c", "atp_c", "co2_c",
+            "o2_c", "pi_c", "adp_c", "glc__D_c", "nadh_c", "nad_c", "nadph_c",
+            "o2_p", "na1_p", "na1_c", "h2o2_c", "h2_c", "glc__D_e", "glc__D_p", "ppi_c", "udp_c");
     /** empty set of IDs */
     private static final Set<String> NO_FIDS = Collections.emptySet();
     /** compartment names for compound IDs */
@@ -391,6 +393,8 @@ public class MetaModel {
             ModelNode node = ModelNode.create(nodeId, (JsonObject) nodeEntry.getValue());
             this.addNode(node);
         }
+        // Start with the default commons.
+        this.commons = DEFAULT_COMMONS;
     }
 
     /**
@@ -738,7 +742,7 @@ public class MetaModel {
      * @return the set of common compounds for this model
      */
     public Set<String> getCommons() {
-        Set<String> retVal = new HashSet<String>(COMMONS);
+        Set<String> retVal = new HashSet<String>(this.commons);
         this.verifyReactionNetwork();
         for (Map.Entry<String, Set<Reaction>> succession : this.successorMap.entrySet()) {
             if (succession.getValue().size() > MAX_SUCCESSORS)

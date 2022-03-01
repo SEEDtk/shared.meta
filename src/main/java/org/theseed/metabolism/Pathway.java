@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -23,6 +24,9 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.theseed.counters.CountMap;
+import org.theseed.excel.CustomWorkbook;
+import org.theseed.genome.Feature;
+import org.theseed.genome.Genome;
 import org.theseed.utils.ParseFailureException;
 
 import com.github.cliftonlabs.json_simple.JsonArray;
@@ -769,6 +773,131 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         return true;
     }
 
+    /**
+     * Write this path to an excel file.
+     *
+     * @param excelFile		output excel file name
+     * @param model			underlying metabolic model
+     */
+    public void saveToExcel(File excelFile, MetaModel model) {
+        // This will collect the triggering genes.
+        Set<String> goodGenes = new TreeSet<String>();
+        // This will collect the input metabolites.
+        CountMap<String> inputCounts = new CountMap<String>();
+        // Get the branching reactions.
+        var branches = this.getBranches(model);
+        // Each pathway element transmits a direct-line input to an output.
+        // The inputs we want to count are the ones not in the direct line.
+        // The first direct-line input is the main input.
+        String oldInput = this.input;
+        // Start the pathway report.
+        try (CustomWorkbook workbook = CustomWorkbook.create(excelFile)) {
+            workbook.addSheet("Pathway", true);
+            workbook.setHeaders(Arrays.asList("reaction", "reaction_name", "rule", "output",
+                    "formula"));
+            for (Pathway.Element element : this) {
+                Reaction reaction = element.getReaction();
+                String intermediate = element.getOutput();
+                String rule = reaction.getReactionRule();
+                workbook.addRow();
+                workbook.storeCell(reaction.getBiggId());
+                workbook.storeCell(reaction.getName());
+                workbook.storeCell(Reaction.getTranslatedRule(rule, model));
+                workbook.storeCell(element.getOutput());
+                workbook.storeCell(reaction.getFormula(element.isReversed()));
+                // Add the triggering genes to the gene set.
+                goodGenes.addAll(reaction.getTriggers());
+                // Get the reaction inputs.
+                var inputs = reaction.getOutputs(intermediate);
+                for (Reaction.Stoich input : inputs) {
+                    // Note we don't count the direct-line input, just the ancillaries.
+                    if (! input.getMetabolite().equals(oldInput))
+                        inputCounts.count(input.getMetabolite(), Math.abs(input.getCoeff()));
+                }
+                // Remember our output as the direct-line input for the next reaction.
+                oldInput = intermediate;
+            }
+            workbook.autoSizeColumns();
+            workbook.addSheet("Inputs", true);
+            // Now list the inputs.
+            workbook.setHeaders(Arrays.asList("metabolite", "needed"));
+            for (CountMap<String>.Count counter : inputCounts.sortedCounts()) {
+                workbook.addRow();
+                workbook.storeCell(counter.getKey());
+                workbook.storeCell(counter.getCount());
+            }
+            workbook.autoSizeColumns();
+            // Now we are working with genes, so we need the base genome.
+            Genome baseGenome = model.getBaseGenome();
+            // The next sheet is the branch reactions.  For each one we we want to show the input metabolite
+            // and the details of the reaction itself.  We also track the triggering genes for the branches.
+            Set<String> badGenes = new TreeSet<String>();
+            workbook.addSheet("Branches", true);
+            workbook.setHeaders(Arrays.asList("input", "reaction", "reaction_name", "rule",
+                    "formula"));
+            for (Map.Entry<String, Set<Reaction>> branchList : branches.entrySet()) {
+                String input = branchList.getKey();
+                for (Reaction reaction : branchList.getValue()) {
+                    workbook.addRow();
+                    workbook.storeCell(input);
+                    workbook.storeCell(reaction.getBiggId());
+                    workbook.storeCell(reaction.getName());
+                    workbook.storeCell(reaction.getReactionRule());
+                    // We need to see if the input requires reversing the reaction.
+                    boolean reverse = reaction.isProduct(input);
+                    workbook.storeCell(reaction.getFormula(reverse));
+                    // Add the triggering genes to the gene set.
+                    badGenes.addAll(reaction.getTriggers());
+                }
+            }
+            workbook.autoSizeColumns();
+            // Write the triggering gene analysis.
+            workbook.addSheet("Triggers", true);
+            // Finally, we write the triggering genes.  There are good ones that trigger the path, and bad
+            // ones that bleed off metabolites into other reactions.
+            var aliasMap = baseGenome.getAliasMap();
+            workbook.setHeaders(Arrays.asList("gene", "fid", "aliases", "function", "type"));
+            this.writeGenes(workbook, goodGenes, baseGenome, aliasMap, "trigger");
+            this.writeGenes(workbook, badGenes, baseGenome, aliasMap, "branch");
+            workbook.autoSizeColumns();
+        }
 
+    }
+
+    /**
+     * This method will write a set of genes to the triggering worksheet.
+     *
+     * @param workbook		output workbook
+     * @param genes			set of genes to write
+     * @param baseGenome	base genome for the current model
+     * @param aliasMap		alias map for the base genome
+     * @param type			type of gene-- "trigger" or "branch"
+     */
+    private void writeGenes(CustomWorkbook workbook, Set<String> genes, Genome baseGenome,
+            Map<String, Set<String>> aliasMap, String type) {
+        for (String gene : genes) {
+            var fids = aliasMap.get(gene);
+            if (fids == null) {
+                workbook.addRow();
+                workbook.storeCell(gene);
+                workbook.storeBlankCell();
+                workbook.storeBlankCell();
+                workbook.storeBlankCell();
+                workbook.storeBlankCell();
+            } else {
+                for (String fid : fids) {
+                    workbook.addRow();
+                    Feature feat = baseGenome.getFeature(fid);
+                    var aliases = feat.getAliases();
+                    String aliasList = StringUtils.join(aliases, ", ");
+                    workbook.storeCell(gene);
+                    workbook.storeCell(fid);
+                    workbook.storeCell(aliasList);
+                    workbook.storeCell(feat.getPegFunction());
+                    workbook.storeCell(type);
+                }
+            }
+        }
+    }
 
 }

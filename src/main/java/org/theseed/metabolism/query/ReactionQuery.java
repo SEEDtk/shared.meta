@@ -5,6 +5,7 @@ package org.theseed.metabolism.query;
 
 import java.util.Collections;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.theseed.metabolism.Reaction;
@@ -66,6 +67,13 @@ public abstract class ReactionQuery {
             @Override
             public ReactionQuery create(IParms processor) throws ParseFailureException {
                 return new ReactionQuery.Consumers(processor);
+            }
+        },
+        /** find reactions to produce or consume a specified compound */
+        REACTIONS {
+            @Override
+            public ReactionQuery create(IParms processor) throws ParseFailureException {
+                return new ReactionQuery.Reactions(processor);
             }
         },
         /** find reactions triggered by a specified feature */
@@ -207,6 +215,24 @@ public abstract class ReactionQuery {
         @Override
         protected Set<Reaction> getReactions(MetaModel model, String metabolite) {
             return model.getSuccessors(metabolite);
+        }
+
+    }
+
+    /**
+     * Query for all reactions that produce or consume a compound.
+     */
+    public static class Reactions extends CompoundReactionQuery {
+
+        public Reactions(IParms processor) throws ParseFailureException {
+            super(processor);
+        }
+
+        @Override
+        protected Set<Reaction> getReactions(MetaModel model, String metabolite) {
+            var retVal = new TreeSet<Reaction>(model.getSuccessors(metabolite));
+            retVal.addAll(model.getProducers(metabolite));
+            return retVal;
         }
 
     }
