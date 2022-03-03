@@ -14,6 +14,8 @@ import javax.xml.stream.XMLStreamException;
 
 import org.junit.jupiter.api.Test;
 import org.theseed.genome.Genome;
+import org.theseed.metabolism.mods.AvoidPathwayFilter;
+import org.theseed.metabolism.mods.IncludePathwayFilter;
 import org.theseed.utils.ParseFailureException;
 
 /**
@@ -40,23 +42,29 @@ public class PathwayQueryTest {
         validatePath(path2, "succ_c", "glu__L_c");
         checkInclude(path2, "icit_c");
         // Test query 3: A to B avoiding C.
-        Pathway path3 = model.getPathway("icit_c", "mal__L_c", new AvoidPathwayFilter("glx_c"));
+        model.addFilter(new AvoidPathwayFilter("glx_c"));
+        Pathway path3 = model.getPathway("icit_c", "mal__L_c");
         validatePath(path3, "icit_c", "mal__L_c");
         checkAvoid(path3, "glx_c");
         // Use an include filter.
-        Pathway path4 = model.getPathway("icit_c", "mal__L_c", new IncludePathwayFilter(model, "CITL"));
+        model.clearFilters();
+        model.addFilter(new IncludePathwayFilter("CITL"));
+        Pathway path4 = model.getPathway("icit_c", "mal__L_c");
         validatePath(path4, "icit_c", "mal__L_c");
         checkReactions(path4, "CITL");
         // Test query 4: A to A via B.  This involves extending path1 back to A.
+        model.clearFilters();
         path2 = model.loopPathway(path1);
         validatePath(path2, "succ_c", "succ_c");
         checkInclude(path2, "icit_c");
         // Test query 5: A to A via B avoiding C.  This involves extending path3 back to A.
-        path3 = model.loopPathway(path3, new AvoidPathwayFilter("glx_c"));
+        model.addFilter(new AvoidPathwayFilter("glx_c"));
+        path3 = model.loopPathway(path3);
         validatePath(path3, "icit_c", "icit_c");
         checkInclude(path3, "mal__L_c");
         checkAvoid(path3, "glx_c");
         // Now test the active-direction stuff.  We need a reaction to manipulate.
+        model.clearFilters();
         Reaction acontA = model.getReaction("ACONTa");
         path1 = model.getPathway("icit_c", "cit_c");
         validatePath(path1, "icit_c", "cit_c");

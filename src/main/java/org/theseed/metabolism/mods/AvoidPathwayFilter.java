@@ -1,10 +1,14 @@
 /**
  *
  */
-package org.theseed.metabolism;
+package org.theseed.metabolism.mods;
 
 import java.util.Set;
 import java.util.TreeSet;
+
+import org.apache.commons.lang3.StringUtils;
+import org.theseed.metabolism.Pathway;
+
 
 /**
  * This pathway filter will reject a pathway immediately if it tries to go
@@ -19,8 +23,9 @@ public class AvoidPathwayFilter extends PathwayFilter {
     /** IDs for the set of compounds to avoid */
     private Set<String> prohibited;
 
-    public AvoidPathwayFilter(IParms processor) {
-        this.prohibited = new TreeSet<String>(processor.getAvoid());
+    public AvoidPathwayFilter(String line) {
+        super(line);
+        this.prohibited = Set.of(StringUtils.split(line));
     }
 
     /**
@@ -29,6 +34,7 @@ public class AvoidPathwayFilter extends PathwayFilter {
      * @param prohibit	array of prohibited compounds
      */
     public AvoidPathwayFilter(String... prohibit) {
+        super(null);
         this.prohibited = new TreeSet<String>();
         for (String compound : prohibit)
             this.prohibited.add(compound);
@@ -52,6 +58,17 @@ public class AvoidPathwayFilter extends PathwayFilter {
             retVal = ! (this.prohibited.contains(segment.getOutput()));
         }
         return retVal;
+    }
+
+    @Override
+    protected String getParms() {
+        return StringUtils.join(this.prohibited, " ");
+    }
+
+    @Override
+    protected boolean checkEqual(Object other) {
+        AvoidPathwayFilter o = (AvoidPathwayFilter) other;
+        return (this.prohibited.equals(o.prohibited));
     }
 
 }

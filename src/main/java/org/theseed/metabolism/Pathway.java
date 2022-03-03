@@ -642,20 +642,18 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      *
      * @param model		parent model of the pathway
      * @param bigg2		BiGG ID of the output compound
-     * @param filters	filters to apply
      */
-    public Pathway extend(MetaModel model, String bigg2, PathwayFilter... filters) {
-        return model.extendPathway(this, bigg2, filters);
+    public Pathway extend(MetaModel model, String bigg2) {
+        return model.extendPathway(this, bigg2);
     }
 
     /**
      * @return a pathway formed by looping this one back to a starting compound
      *
      * @param model		parent model of the pathway
-     * @param filters	filters to apply
      */
-    public Pathway loop(MetaModel model, PathwayFilter... filters) {
-        return model.loopPathway(this, filters);
+    public Pathway loop(MetaModel model) {
+        return model.loopPathway(this);
     }
 
     /**

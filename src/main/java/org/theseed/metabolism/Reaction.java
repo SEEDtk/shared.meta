@@ -6,6 +6,7 @@ package org.theseed.metabolism;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -771,6 +772,21 @@ public class Reaction implements Comparable<Reaction> {
      */
     public void setActive(ActiveDirections active) {
         this.active = active;
+    }
+
+    /**
+     * This is a comparator for sorting reactions by name.
+     */
+    public static class ByName implements Comparator<Reaction> {
+
+        @Override
+        public int compare(Reaction o1, Reaction o2) {
+            int retVal = o1.name.compareTo(o2.name);
+            if (retVal == 0)
+                retVal = o1.id - o2.id;
+            return retVal;
+        }
+
     }
 
 }

@@ -15,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.metabolism.MetaModel;
-import org.theseed.metabolism.Reaction;
 import org.theseed.metabolism.Reaction.ActiveDirections;
 
 import com.github.cliftonlabs.json_simple.JsonArray;
@@ -23,14 +22,10 @@ import com.github.cliftonlabs.json_simple.JsonKey;
 import com.github.cliftonlabs.json_simple.JsonObject;
 
 /**
- * This object represents a list of modifiers.  The modifiers are applied to the reactions in a metabolic
- * model to suppress or prevent reversing of certain reactions.  The modifier list can be stored in JSON
- * form or as a tab-delimited flat file with headers. In the latter case, the command is in the first
- * column and the parameter string in the second.  Valid commands are
- *
- * 	suppress	suppress the named reactions; parameter is reaction BiGG IDs, space-delimited
- * 	forward		suppress reversal of reactions with the specified inputs; parameter is input compound
- * 				BiGG IDs, space-delimited
+ * This object represents a list of modifiers.  The modifiers are applied to a metabolic model to
+ * to suppress directional flow of certain reactions and to otherwise modify construction of pathways.
+ * The modifier list can be stored in JSON form or as a tab-delimited flat file with headers. In the latter
+ * case, the command is in the first column and the parameter string in the second.
  *
  * @author Bruce Parrello
  *
@@ -41,7 +36,7 @@ public class ModifierList {
     /** logging facility */
     protected static Logger log = LoggerFactory.getLogger(ModifierList.class);
     /** list of (command, flow modifier) pairs */
-    private List<Map.Entry<String, FlowModifier>> modifiers;
+    private List<Map.Entry<String, Modifier>> modifiers;
 
     /**
      * This enum defines the JSON keys we use.
@@ -71,33 +66,50 @@ public class ModifierList {
 
     }
 
-
-
     /**
      * This enum describes the various flow modifier types.
      */
     public static enum Command {
+        /** insure specified compounds only appear on the input side of a reaction */
         FORWARD {
             @Override
-            public FlowModifier create(String line) {
+            public Modifier create(String line) {
                 return new ForwardOnlyModifier(line);
             }
-        }, SUPPRESS {
+        },
+        /** suppress one or more reactions */
+        SUPPRESS {
             @Override
-            public FlowModifier create(String line) {
+            public Modifier create(String line) {
                 return new ReactionFlowModifier(line, ActiveDirections.NEITHER);
             }
         },
+        /** prevent reversing of one or more reactions */
         ONEWAY {
             @Override
-            public FlowModifier create(String line) {
+            public Modifier create(String line) {
                 return new ReactionFlowModifier(line, ActiveDirections.FORWARD);
             }
         },
+        /** require reversing of one or more reactions */
         INVERTED {
             @Override
-            public FlowModifier create(String line) {
+            public Modifier create(String line) {
                 return new ReactionFlowModifier(line, ActiveDirections.REVERSE);
+            }
+        },
+        /** avoid one or more compounds in the main pathway */
+        AVOID {
+            @Override
+            public Modifier create(String line) {
+                return new AvoidPathwayFilter(line);
+            }
+        },
+        /** specify one or more compounds as common */
+        COMMONS {
+            @Override
+            public Modifier create(String line) {
+                return new CommonCompoundModifier(line);
             }
         };
 
@@ -106,7 +118,7 @@ public class ModifierList {
          *
          * @param line		parameter string
          */
-        public abstract FlowModifier create(String line);
+        public abstract Modifier create(String line);
 
     }
 
@@ -190,8 +202,8 @@ public class ModifierList {
             throw new IOException("Invalid flow modifier command code \"" + command + "\".");
         }
         // Build the modifier from the command and parameter string.
-        FlowModifier modifier = commandCode.create(parms);
-        this.modifiers.add(new AbstractMap.SimpleEntry<String, FlowModifier>(command, modifier));
+        Modifier modifier = commandCode.create(parms);
+        this.modifiers.add(new AbstractMap.SimpleEntry<String, Modifier>(command, modifier));
     }
 
     /**
@@ -202,7 +214,7 @@ public class ModifierList {
      */
     public JsonArray toJson() {
         JsonArray retVal = new JsonArray();
-        for (Map.Entry<String, FlowModifier> modEntry : this.modifiers) {
+        for (Map.Entry<String, Modifier> modEntry : this.modifiers) {
             JsonObject modJson = new JsonObject().putChain("command", modEntry.getKey())
                     .putChain("parms", modEntry.getValue().getParms());
             retVal.add(modJson);
@@ -217,27 +229,14 @@ public class ModifierList {
      *
      * @return the number of modifications made
      */
-    public int apply(MetaModel model) {
-        int retVal = 0;
-        int flowCount = this.modifiers.size();
-        if (flowCount == 0)
-            log.info("No flow modifiers to apply.");
-        else {
-            // This will count the number of modifications made.
-            int rCount = 0;
-            // Loop through the reactions.
-            for (Reaction reaction : model.getAllReactions()) {
-                rCount++;
-                // Remember the active direction.  We want to know if it changes.
-                Reaction.ActiveDirections oldActive = reaction.getActive();
-                // Apply each flow modifier to this reaction.
-                this.modifiers.stream().forEach(x -> x.getValue().setActiveDirections(reaction));
-                if (reaction.getActive() != oldActive)
-                    retVal++;
-            }
-            log.info("{} of {} reactions affected by {} flow modifiers.", retVal, rCount, this.modifiers.size());
+    public void apply(MetaModel model) {
+        // Clean the model.
+        model.clearMods();
+        // Apply the modifiers.
+        for (Map.Entry<String, Modifier> modEntry : this.modifiers) {
+            Modifier mod = modEntry.getValue();
+            mod.updateModel(model);
         }
-        return retVal;
     }
 
     @Override

@@ -27,6 +27,7 @@ public class ReactionFlowModifier extends FlowModifier {
      * Construct a one-way modifier from the specified input line.
      *
      * @param line			input line containing reactions to make one-way (space-delimited)
+     * @param model			target model
      * @param direction		active direction to specify for the reactions
      */
     public ReactionFlowModifier(String line, ActiveDirections direction) {
@@ -56,7 +57,7 @@ public class ReactionFlowModifier extends FlowModifier {
     @Override
     public int hashCode() {
         final int prime = 31;
-        int result = 1;
+        int result = this.getClass().hashCode();
         result = prime * result + this.dir.ordinal();
         result = prime * result + ((this.reactions == null) ? 0 : this.reactions.hashCode());
         return result;

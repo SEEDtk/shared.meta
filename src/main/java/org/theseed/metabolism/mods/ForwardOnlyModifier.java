@@ -36,7 +36,7 @@ public class ForwardOnlyModifier extends FlowModifier {
     @Override
     public int hashCode() {
         final int prime = 31;
-        int result = 1;
+        int result = this.getClass().hashCode();
         result = prime * result + ((this.cofactorSet == null) ? 0 : this.cofactorSet.hashCode());
         return result;
     }

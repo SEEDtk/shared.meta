@@ -82,7 +82,16 @@ public abstract class ReactionQuery {
             public ReactionQuery create(IParms processor) throws ParseFailureException {
                 return new ReactionQuery.Triggered(processor);
             }
-        };
+        },
+        /** list all of the reactions */
+        ALL {
+            @Override
+            public ReactionQuery create(IParms processor) throws ParseFailureException {
+                return new ReactionQuery.All(processor);
+            }
+
+        }
+        ;
 
         /**
          * @return a query object of this type
@@ -149,6 +158,27 @@ public abstract class ReactionQuery {
             // Compute the triggered reactions for the features found.
             Set<Reaction> retVal = fids.stream().flatMap(x -> model.getTriggeredReactions(x).stream())
                     .collect(Collectors.toSet());
+            return retVal;
+        }
+
+    }
+
+    /**
+     * This report simply returns all of the reactions.
+     */
+    public static class All extends ReactionQuery {
+
+        public All(IParms processor) {
+            super(processor);
+        }
+
+        @Override
+        public Set<Reaction> get() {
+            // We want them sorted by name, so we create a tree set using an alternate
+            // comparator.
+            var retVal = new TreeSet<Reaction>(new Reaction.ByName());
+            // All all of the reactions to the set.
+            retVal.addAll(this.getModel().getAllReactions());
             return retVal;
         }
 

@@ -9,6 +9,7 @@ import org.theseed.io.TabbedLineReader;
 import org.theseed.metabolism.Reaction.ActiveDirections;
 import org.theseed.metabolism.mods.FlowModifier;
 import org.theseed.metabolism.mods.ForwardOnlyModifier;
+import org.theseed.metabolism.mods.IncludePathwayFilter;
 import org.theseed.metabolism.mods.ModifierList;
 import org.theseed.metabolism.mods.ReactionFlowModifier;
 import org.theseed.utils.ParseFailureException;
@@ -80,8 +81,9 @@ class FlowModifierTests {
                 }
             }
         }
-        Pathway path1 = model.getPathway("glu__L_e", "glu__L_p").extend(model, "glu__L_c")
-                .extend(model, "ser__L_c", new IncludePathwayFilter(model, "PSP_L"));
+        Pathway path1 = model.getPathway("glu__L_e", "glu__L_p").extend(model, "glu__L_c");
+        model.addFilter(new IncludePathwayFilter("PSP_L"));
+        path1 = path1.extend(model, "ser__L_c");
         assertThat(path1.getFirst().getInputs(), hasItem("glu__L_e"));
         assertThat(path1.getOutput(), equalTo("ser__L_c"));
         for (Pathway.Element elt : path1) {

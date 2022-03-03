@@ -8,7 +8,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -29,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.genome.Genome;
 import org.theseed.metabolism.Reaction.ActiveDirections;
+import org.theseed.metabolism.mods.PathwayFilter;
 
 import com.github.cliftonlabs.json_simple.JsonArray;
 import com.github.cliftonlabs.json_simple.JsonException;
@@ -84,6 +84,8 @@ public class MetaModel {
     private Map<String, Set<String>> aliasMap;
     /** current list of common compounds */
     private Set<String> commons;
+    /** current list of filters */
+    private List<PathwayFilter> filters;
     /** maximum number of successor reactions for a compound to be considered common */
     private static int MAX_SUCCESSORS = 20;
     /** maximum pathway length */
@@ -393,8 +395,9 @@ public class MetaModel {
             ModelNode node = ModelNode.create(nodeId, (JsonObject) nodeEntry.getValue());
             this.addNode(node);
         }
-        // Start with the default commons.
+        // Start with the default commons and no filters.
         this.commons = DEFAULT_COMMONS;
+        this.filters = new ArrayList<PathwayFilter>();
     }
 
     /**
@@ -764,9 +767,8 @@ public class MetaModel {
      *
      * @param bigg1		BiGG ID of start metabolite
      * @param bigg2		BiGG ID of end metabolite
-     * @param filters	list of pathway filters to use
      */
-    public Pathway getPathway(String bigg1, String bigg2, PathwayFilter... filters) {
+    public Pathway getPathway(String bigg1, String bigg2) {
         // This will hold the return pathway.
         Pathway retVal = null;
         // Get the starting reactions.
@@ -781,7 +783,7 @@ public class MetaModel {
                 for (Reaction.Stoich node : outputs)
                     initial.add(new Pathway(bigg1, starter, node, bigg2));
             }
-            retVal = this.findPathway(initial, filters);
+            retVal = this.findPathway(initial);
         }
         return retVal;
     }
@@ -791,12 +793,11 @@ public class MetaModel {
      *
      * @param start		initial pathway to extend
      * @param bigg2		BiGG ID of end metabolite
-     * @param filters	pathway filters to use
      */
-    public Pathway extendPathway(Pathway start, String bigg2, PathwayFilter... filters) {
+    public Pathway extendPathway(Pathway start, String bigg2) {
         start.setGoal(bigg2);
         var initial = Collections.singleton(start);
-        return this.findPathway(initial, filters);
+        return this.findPathway(initial);
     }
 
     /**
@@ -805,11 +806,10 @@ public class MetaModel {
      * reversible, however, we have to search from both ends of the pathway.
      *
      * @param path1		pathway to loop
-     * @param filters	pathway filters to use
      *
      * @return			a looped pathway fulfilling the terms of the filter
      */
-    public Pathway loopPathway(Pathway path1, PathwayFilter... filters) {
+    public Pathway loopPathway(Pathway path1) {
         List<Pathway> starters = new ArrayList<Pathway>(2);
         if (path1.isReversible()) {
             // Reverse the pathway and set a goal to get back to the old output.
@@ -821,7 +821,7 @@ public class MetaModel {
         // Set a goal to extend the pathway back to the origin.
         path1.setGoal(path1.getInput());
         starters.add(path1);
-        return this.findPathway(starters, filters);
+        return this.findPathway(starters);
     }
 
     /**
@@ -831,14 +831,13 @@ public class MetaModel {
      *
      * @param initial	initial set of pathways to start from
      * @param bigg2		BiGG ID of desired output compound
-     * @param filters	pathway filters to use
      *
      * @return the shortest pathway that satisfies all the criteria, or NULL if none
      * 		   was found
      */
-    public Pathway findPathway(Collection<Pathway> initial, String bigg2, PathwayFilter... filters) {
+    public Pathway findPathway(Collection<Pathway> initial, String bigg2) {
         initial.stream().forEach(x -> x.setGoal(bigg2));
-        return findPathway(initial, filters);
+        return findPathway(initial);
     }
     /**
      * Find a pathway from a particular starting list using a particular set of filters.
@@ -846,12 +845,11 @@ public class MetaModel {
      * in the list to that pathway's goal.
      *
      * @param initial	initial set of pathways to start from
-     * @param filters	pathway filters to use
      *
      * @return the shortest pathway that satisfies all the criteria, or NULL if none
      * 		   was found
      */
-    private Pathway findPathway(Collection<Pathway> initial, PathwayFilter... filters) {
+    private Pathway findPathway(Collection<Pathway> initial) {
         this.verifyReactionNetwork();
         // Compute the common compounds.
         Set<String> commons = this.getCommons();
@@ -888,7 +886,7 @@ public class MetaModel {
                 // If we keep the path, it terminates the loop.  If we decide it
                 // is missing a key reaction, the path dies and we keep looking
                 // for others.
-                if (Arrays.stream(filters).allMatch(x -> x.isGood(path)))
+                if (this.filters.stream().allMatch(x -> x.isGood(path)))
                     retVal = path;
             } else {
                 // Get the BiGG ID for the output of the path.
@@ -910,7 +908,7 @@ public class MetaModel {
                             int dist = distanceMap.getOrDefault(output.getMetabolite(), MAX_PATH_LEN);
                             if (dist + path.size() < MAX_PATH_LEN) {
                                 Pathway newPath = path.clone().add(successor, output);
-                                if (Arrays.stream(filters).allMatch(x -> x.isPossible(newPath)))
+                                if (this.filters.stream().allMatch(x -> x.isPossible(newPath)))
                                     queue.add(newPath);
                             }
                         }
@@ -1184,6 +1182,40 @@ public class MetaModel {
             retVal = nodes.get(0).getName() + compartment;
         }
         return retVal;
+    }
+
+    /**
+     * Add a pathway filter to the filter queue.
+     *
+     * @param filter	filter to add
+     */
+    public void addFilter(PathwayFilter filter) {
+        this.filters.add(filter);
+    }
+
+    /**
+     * Clear the filter queue.
+     */
+    public void clearFilters() {
+        this.filters.clear();
+    }
+
+    /**
+     * Clear all the modifications to the model.
+     */
+    public void clearMods() {
+        this.commons.clear();
+        this.clearFilters();
+        this.resetFlow();
+    }
+
+    /**
+     * Add a new group of common compounds to the common-compounds set.
+     *
+     * @param newCommons	collection of BiGG IDs for the new compounds to add
+     */
+    public void addCommons(Collection<String> newCommons) {
+        this.commons.addAll(newCommons);
     }
 
 }

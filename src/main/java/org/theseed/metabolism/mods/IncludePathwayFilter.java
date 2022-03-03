@@ -1,12 +1,13 @@
 /**
  *
  */
-package org.theseed.metabolism;
+package org.theseed.metabolism.mods;
 
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.theseed.utils.ParseFailureException;
+import org.apache.commons.lang3.StringUtils;
+import org.theseed.metabolism.Pathway;
 
 /**
  * This pathway filter will only accept a path if it contains certain reactions.
@@ -20,42 +21,22 @@ public class IncludePathwayFilter extends PathwayFilter {
     /** set of required reactions */
     private Set<String> required;
 
-    public IncludePathwayFilter(IParms processor) throws ParseFailureException {
-        this.required = new TreeSet<String>(processor.getInclude());
-        MetaModel model = processor.getModel();
-        // Validate the reaction list.
-        checkRequired(model);
+    public IncludePathwayFilter(String line) {
+        super(line);
+        this.required = Set.of(StringUtils.split(line));
     }
 
     /**
      * Create a pathway filter that requires the specified reactions.
      *
-     * @param model		relevant metabolic model
      * @param includes	array of bigg IDs for the reactions to include
      *
-     * @throws ParseFailureException
      */
-    public IncludePathwayFilter(MetaModel model, String... includes) throws ParseFailureException {
+    public IncludePathwayFilter(String... includes) {
+        super(null);
         this.required = new TreeSet<String>();
         for (String reaction : includes)
             this.required.add(reaction);
-        // Validate the reaction list.
-        this.checkRequired(model);
-    }
-
-    /**
-     * Validate the reaction list.
-     *
-     * @param model		target model for validation
-     *
-     * @throws ParseFailureException
-     */
-    private void checkRequired(MetaModel model) throws ParseFailureException {
-        for (String reactionId : this.required) {
-            if (model.getReaction(reactionId) == null)
-                throw new ParseFailureException("Reaction \"" + reactionId +
-                        " \" not found in model.");
-        }
     }
 
     @Override
@@ -75,6 +56,17 @@ public class IncludePathwayFilter extends PathwayFilter {
                 found++;
         }
         return (found >= required.size());
+    }
+
+    @Override
+    protected String getParms() {
+        return StringUtils.join(required, " ");
+    }
+
+    @Override
+    protected boolean checkEqual(Object other) {
+        IncludePathwayFilter o = (IncludePathwayFilter) other;
+        return this.required.equals(o.required);
     }
 
 }
