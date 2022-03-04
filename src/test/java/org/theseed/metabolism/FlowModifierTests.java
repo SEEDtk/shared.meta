@@ -80,6 +80,10 @@ class FlowModifierTests {
                     assertThat(stoich.getMetabolite(), not(in(compounds)));
             }
         }
+        File saveFile = new File("data", "mods.ser");
+        mods.save(saveFile);
+        ModifierList mods2 = new ModifierList(saveFile);
+        assertThat(mods2, equalTo(mods));
     }
 
 

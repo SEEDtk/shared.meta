@@ -95,7 +95,7 @@ public class MetaModel {
     /** return value when no metabolite nodes are found */
     private static final List<ModelNode.Metabolite> NO_METABOLITES = Collections.emptyList();
     /** default set of common compounds */
-    private static final Set<String> DEFAULT_COMMONS = Set.of("h_c", "h_p", "h2o_c", "atp_c", "co2_c",
+    public static final Set<String> DEFAULT_COMMONS = Set.of("h_c", "h_p", "h2o_c", "atp_c", "co2_c",
             "o2_c", "pi_c", "adp_c", "glc__D_c", "nadh_c", "nad_c", "nadph_c",
             "o2_p", "na1_p", "na1_c", "h2o2_c", "h2_c", "glc__D_e", "glc__D_p", "ppi_c", "udp_c");
     /** empty set of IDs */
@@ -396,7 +396,7 @@ public class MetaModel {
             this.addNode(node);
         }
         // Start with the default commons and no filters.
-        this.commons = DEFAULT_COMMONS;
+        this.commons = new HashSet<String>(DEFAULT_COMMONS);
         this.filters = new ArrayList<PathwayFilter>();
     }
 

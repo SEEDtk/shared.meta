@@ -24,7 +24,10 @@ public class CommonCompoundModifier extends Modifier {
 
     public CommonCompoundModifier(String line) {
         super(line);
-        this.commons = Set.of(StringUtils.split(line));
+        if (line.contentEquals("default"))
+            this.commons = MetaModel.DEFAULT_COMMONS;
+        else
+            this.commons = Set.of(StringUtils.split(line));
     }
 
     @Override
