@@ -15,17 +15,24 @@ import org.theseed.metabolism.MetaModel;
  */
 public abstract class Modifier {
 
+    // FIELDS
+    /** TRUE if this modifier is active, else FALSE */
+    private boolean active;
+
     /**
      * Construct a new modifier from a parameter line and a metabolic model.
      *
      * @param line		parameter line to parse (optional)
      */
-    public Modifier(String line) { }
+    public Modifier(String line) {
+        // The modifier stays on until we turn it off.
+        this.active = true;
+    }
 
     /**
      * @return the parameter line for this modifier
      */
-    protected abstract String getParms();
+    public abstract String getParms();
 
     /**
      * Update the model with this modifier.
@@ -52,6 +59,25 @@ public abstract class Modifier {
         return retVal;
     }
 
+    /**
+     * @return TRUE if this modifier should be used, FALSE if it is turned off
+     */
+    public boolean isActive() {
+        return this.active;
+    }
 
+    /**
+     * Specify whether or not this modifier should be used.
+     *
+     * @param active 	TRUE to turn on the modifier, FALSE to suppress it
+     */
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    /**
+     * @return the command code for this modifier
+     */
+    public abstract String getCommand();
 
 }

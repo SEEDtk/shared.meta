@@ -61,7 +61,7 @@ public class AvoidPathwayFilter extends PathwayFilter {
     }
 
     @Override
-    protected String getParms() {
+    public String getParms() {
         return StringUtils.join(this.prohibited, " ");
     }
 
@@ -69,6 +69,11 @@ public class AvoidPathwayFilter extends PathwayFilter {
     protected boolean checkEqual(Object other) {
         AvoidPathwayFilter o = (AvoidPathwayFilter) other;
         return (this.prohibited.equals(o.prohibited));
+    }
+
+    @Override
+    public String getCommand() {
+        return "AVOID";
     }
 
 }

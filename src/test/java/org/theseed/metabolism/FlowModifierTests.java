@@ -14,8 +14,6 @@ import org.theseed.metabolism.mods.ModifierList;
 import org.theseed.metabolism.mods.ReactionFlowModifier;
 import org.theseed.utils.ParseFailureException;
 
-import com.github.cliftonlabs.json_simple.JsonArray;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import java.io.File;
@@ -40,18 +38,6 @@ class FlowModifierTests {
         assertThat(mod2, not(equalTo(mod4)));
         assertThat(mod2, not(equalTo(mod3)));
         assertThat(mod4, equalTo(mod5));
-    }
-
-    @Test
-    void testSaveLoad() throws IOException {
-        File testFile = new File("data", "flowmods.tbl");
-        ModifierList mods;
-        try (TabbedLineReader reader = new TabbedLineReader(testFile)) {
-            mods = new ModifierList(reader);
-        }
-        JsonArray modsJson = mods.toJson();
-        ModifierList mods2 = new ModifierList(modsJson);
-        assertThat(mods, equalTo(mods2));
     }
 
     @Test

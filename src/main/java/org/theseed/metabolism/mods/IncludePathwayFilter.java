@@ -59,7 +59,7 @@ public class IncludePathwayFilter extends PathwayFilter {
     }
 
     @Override
-    protected String getParms() {
+    public String getParms() {
         return StringUtils.join(required, " ");
     }
 
@@ -67,6 +67,11 @@ public class IncludePathwayFilter extends PathwayFilter {
     protected boolean checkEqual(Object other) {
         IncludePathwayFilter o = (IncludePathwayFilter) other;
         return this.required.equals(o.required);
+    }
+
+    @Override
+    public String getCommand() {
+        return "INCLUDE";
     }
 
 }

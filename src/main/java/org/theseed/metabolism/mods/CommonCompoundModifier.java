@@ -28,7 +28,7 @@ public class CommonCompoundModifier extends Modifier {
     }
 
     @Override
-    protected String getParms() {
+    public String getParms() {
         return StringUtils.join(this.commons, " ");
     }
 
@@ -41,6 +41,11 @@ public class CommonCompoundModifier extends Modifier {
     protected boolean checkEqual(Object other) {
         CommonCompoundModifier o = (CommonCompoundModifier) other;
         return (this.commons.equals(o.commons));
+    }
+
+    @Override
+    public String getCommand() {
+        return "COMMONS";
     }
 
 }

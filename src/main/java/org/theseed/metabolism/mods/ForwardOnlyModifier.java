@@ -52,4 +52,9 @@ public class ForwardOnlyModifier extends FlowModifier {
         return this.cofactorSet.equals(otherActual.cofactorSet);
     }
 
+    @Override
+    public String getCommand() {
+        return "FORWARD";
+    }
+
 }

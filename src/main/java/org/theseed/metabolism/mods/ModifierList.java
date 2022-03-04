@@ -5,66 +5,34 @@ package org.theseed.metabolism.mods;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.AbstractMap;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.metabolism.MetaModel;
 import org.theseed.metabolism.Reaction.ActiveDirections;
 
-import com.github.cliftonlabs.json_simple.JsonArray;
-import com.github.cliftonlabs.json_simple.JsonKey;
-import com.github.cliftonlabs.json_simple.JsonObject;
-
 /**
  * This object represents a list of modifiers.  The modifiers are applied to a metabolic model to
  * to suppress directional flow of certain reactions and to otherwise modify construction of pathways.
- * The modifier list can be stored in JSON form or as a tab-delimited flat file with headers. In the latter
- * case, the command is in the first column and the parameter string in the second.
+ * The modifier list is stored in a tab-delimited flat file with headers. The command is in the
+ * first column and the parameter string in the second.  A leading pound sign (#) means the modifier
+ * should start deactivated.
  *
  * @author Bruce Parrello
  *
  */
-public class ModifierList {
+public class ModifierList implements Iterable<Modifier> {
 
     // FIELDS
     /** logging facility */
     protected static Logger log = LoggerFactory.getLogger(ModifierList.class);
     /** list of (command, flow modifier) pairs */
-    private List<Map.Entry<String, Modifier>> modifiers;
-
-    /**
-     * This enum defines the JSON keys we use.
-     */
-    private static enum FlowKeys implements JsonKey {
-        COMMAND("SUPPRESS"), PARMS("");
-
-        private final Object m_value;
-
-        private FlowKeys(final Object value) {
-            this.m_value = value;
-        }
-
-        /** This is the string used as a key in the incoming JsonObject map.
-         */
-        @Override
-        public String getKey() {
-            return this.name().toLowerCase();
-        }
-
-        /** This is the default value used when the key is not found.
-         */
-        @Override
-        public Object getValue() {
-            return this.m_value;
-        }
-
-    }
+    private List<Modifier> modifiers;
 
     /**
      * This enum describes the various flow modifier types.
@@ -145,28 +113,21 @@ public class ModifierList {
     }
 
     /**
-     * Create an empty modifier list.
+     * Create an immutable, empty modifier list.
      */
     public ModifierList() {
         this.modifiers = Collections.emptyList();
     }
 
     /**
-     * Create a modifier list from a JSON object.
+     * Create a modifier list backed by a list of Modifier objects.  Changes to the list
+     * will be reflected automatically in this object.
      *
-     * @param json		JSON array containing the flow modifier descriptors
-     *
-     * @throws IOException
+     * @param list	underlying list of modifiers to use
      */
-    public ModifierList(JsonArray json) throws IOException {
-        this.modifiers = new ArrayList<>(json.size());
-        for (Object modObj : json) {
-            JsonObject mod = (JsonObject) modObj;
-            String command = mod.getStringOrDefault(FlowKeys.COMMAND);
-            String parms = mod.getStringOrDefault(FlowKeys.PARMS);
-            this.addModifier(command, parms);
-        }
-   }
+    public ModifierList(List<Modifier> list) {
+        this.modifiers = list;
+    }
 
     /**
      * Read a modifier list from a tab-delimited input stream.
@@ -181,7 +142,12 @@ public class ModifierList {
             // We convert the command to upper case so it matches the enum name.
             String command = line.get(0).toUpperCase();
             String parms = line.get(1);
-            this.addModifier(command, parms);
+            boolean active = true;
+            if (command.startsWith("#")) {
+                active = false;
+                command = command.substring(1);
+            }
+            this.addModifier(command, parms, active);
         }
     }
 
@@ -190,10 +156,11 @@ public class ModifierList {
      *
      * @param command	command (all upper case)
      * @param parms		parameter string
+     * @param active	TRUE if the modifier should be active, else FALSE
      *
      * @throws IOException
      */
-    private void addModifier(String command, String parms) throws IOException {
+    private void addModifier(String command, String parms, boolean active) throws IOException {
         Command commandCode;
         // An invalid command code is rethrown as an IO exception.
         try {
@@ -203,23 +170,8 @@ public class ModifierList {
         }
         // Build the modifier from the command and parameter string.
         Modifier modifier = commandCode.create(parms);
-        this.modifiers.add(new AbstractMap.SimpleEntry<String, Modifier>(command, modifier));
-    }
-
-    /**
-     * This creates the JSON representation of the modifier list.  Each modifier is represented by an
-     * object containing the command name as "command" and the modifier parms as "parms".
-     *
-     * @return a JSON array for this modifier list
-     */
-    public JsonArray toJson() {
-        JsonArray retVal = new JsonArray();
-        for (Map.Entry<String, Modifier> modEntry : this.modifiers) {
-            JsonObject modJson = new JsonObject().putChain("command", modEntry.getKey())
-                    .putChain("parms", modEntry.getValue().getParms());
-            retVal.add(modJson);
-        }
-        return retVal;
+        modifier.setActive(active);
+        this.modifiers.add(modifier);
     }
 
     /**
@@ -233,9 +185,9 @@ public class ModifierList {
         // Clean the model.
         model.clearMods();
         // Apply the modifiers.
-        for (Map.Entry<String, Modifier> modEntry : this.modifiers) {
-            Modifier mod = modEntry.getValue();
-            mod.updateModel(model);
+        for (Modifier mod : this.modifiers) {
+            if (mod.isActive())
+                mod.updateModel(model);
         }
     }
 
@@ -271,6 +223,34 @@ public class ModifierList {
      */
     public int size() {
         return this.modifiers.size();
+    }
+
+    /**
+     * Save the modifiers to a file.
+     *
+     * @param saveFile	file to contain the modifiers
+     *
+     * @throws IOException
+     */
+    public void save(File saveFile) throws IOException {
+        try (PrintWriter writer = new PrintWriter(saveFile)) {
+            writer.println("command\tparms");
+            StringBuilder line = new StringBuilder(80);
+            for (Modifier mod : this.modifiers) {
+                line.setLength(0);
+                // Inactive modifiers are commented out.
+                if (! mod.isActive())
+                    line.append("#");
+                // Format the modifier.
+                line.append(mod.getCommand()).append('\t').append(mod.getParms());
+                writer.println(line);
+            }
+        }
+    }
+
+    @Override
+    public Iterator<Modifier> iterator() {
+        return this.modifiers.iterator();
     }
 
 }

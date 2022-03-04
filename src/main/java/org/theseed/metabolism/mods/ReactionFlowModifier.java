@@ -63,5 +63,10 @@ public class ReactionFlowModifier extends FlowModifier {
         return result;
     }
 
+    @Override
+    public String getCommand() {
+        return this.dir.getCommand();
+    }
+
 
 }

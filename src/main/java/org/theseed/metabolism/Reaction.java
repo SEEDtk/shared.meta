@@ -81,6 +81,11 @@ public class Reaction implements Comparable<Reaction> {
                 return true;
             }
 
+            @Override
+            public String getCommand() {
+                return "REVERSIBLE";
+            }
+
         }, FORWARD {
 
             @Override
@@ -91,6 +96,11 @@ public class Reaction implements Comparable<Reaction> {
             @Override
             public boolean isOutput(Stoich stoich) {
                 return stoich.isProduct();
+            }
+
+            @Override
+            public String getCommand() {
+                return "ONEWAY";
             }
 
         }, REVERSE {
@@ -105,6 +115,11 @@ public class Reaction implements Comparable<Reaction> {
                 return ! stoich.isProduct();
             }
 
+            @Override
+            public String getCommand() {
+                return "INVERTED";
+            }
+
         }, NEITHER {
 
             @Override
@@ -115,6 +130,11 @@ public class Reaction implements Comparable<Reaction> {
             @Override
             public boolean isOutput(Stoich stoich) {
                 return false;
+            }
+
+            @Override
+            public String getCommand() {
+                return "SUPPRESS";
             }
 
         };
@@ -141,6 +161,11 @@ public class Reaction implements Comparable<Reaction> {
         protected static void setDefault(Reaction react) {
             react.active = (react.isReversible() ? BOTH : FORWARD);
         }
+
+        /**
+         * @return the flow modifier command code for this direction
+         */
+        public abstract String getCommand();
 
     }
 
