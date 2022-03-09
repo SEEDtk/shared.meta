@@ -101,7 +101,7 @@ public class MetaModel {
     /** empty set of IDs */
     private static final Set<String> NO_FIDS = Collections.emptySet();
     /** compartment names for compound IDs */
-    private static final Map<String, String> COMPARTMENTS = Map.of("c", " [cytoplasm]", "p", " [periplasm]", "e",
+    private static final Map<String, String> COMPARTMENTS = Map.of("c", "", "p", " [periplasm]", "e",
             " [external]");
 
     /**

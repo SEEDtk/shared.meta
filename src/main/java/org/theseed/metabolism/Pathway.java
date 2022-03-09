@@ -802,7 +802,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
                 workbook.storeCell(reaction.getName());
                 workbook.storeCell(Reaction.getTranslatedRule(rule, model));
                 workbook.storeCell(element.getOutput());
-                workbook.storeCell(reaction.getFormula(element.isReversed()));
+                workbook.storeCell(reaction.getLongFormula(element.isReversed(), model));
                 // Add the triggering genes to the gene set.
                 goodGenes.addAll(reaction.getTriggers());
                 // Get the reaction inputs.

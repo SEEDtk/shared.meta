@@ -267,7 +267,21 @@ public class MetaModelTest {
         assertThat(sugars, containsInAnyOrder("glc__D_p", "glc__D_e", "glc__D_c"));
         assertThat(model.getCompoundName("glc__D_p"), equalTo("D-Glucose [periplasm]"));
         assertThat(model.getCompoundName("glc__D_e"), equalTo("D-Glucose [external]"));
-        assertThat(model.getCompoundName("glc__D_c"), equalTo("D-Glucose [cytoplasm]"));
+        assertThat(model.getCompoundName("glc__D_c"), equalTo("D-Glucose"));
+    }
+
+    @Test
+    public void testFormulas() throws IOException {
+        File gFile = new File("data", "MG1655-wild.gto");
+        File mFile = new File("data", "ecoli_all.json");
+        Genome genome = new Genome(gFile);
+        MetaModel model = new MetaModel(mFile, genome);
+        Reaction react = model.getReaction("HEX1");
+        assertThat(react.getFormula(false), equalTo("atp_c + glc__D_c --> adp_c + g6p_c + h_c"));
+        assertThat(react.getLongFormula(false, model), equalTo("(ATP C10H12N5O13P3) + (D-Glucose) --> (ADP C10H12N5O10P2) + (D-Glucose 6-phosphate) + (H+)"));
+        react = model.getReaction("TALA");
+        assertThat(react.getFormula(true), equalTo("e4p_c + f6p_c <-> g3p_c + s7p_c"));
+        assertThat(react.getLongFormula(true, model), equalTo("(D-Erythrose 4-phosphate) + (D-Fructose 6-phosphate) <-> (Glyceraldehyde 3-phosphate) + (Sedoheptulose 7-phosphate)"));
     }
 
 }

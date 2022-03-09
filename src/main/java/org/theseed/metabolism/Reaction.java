@@ -18,7 +18,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
-
 import com.github.cliftonlabs.json_simple.JsonArray;
 import com.github.cliftonlabs.json_simple.JsonKey;
 import com.github.cliftonlabs.json_simple.JsonObject;
@@ -610,30 +609,81 @@ public class Reaction implements Comparable<Reaction> {
     }
 
     /**
+     * This rather arcane method returns the reaction formula string in a parsed format.  It will
+     * consist of an array of strings.  The first string will be a connector, the second a compound
+     * ID, the third another connector, and so on until the end.  The first string may be empty in
+     * order to enforce the pattern.  This string list can then be formatted at will be the client
+     * into HTML, JavaFX flowed text, or any number of crazy things.
+     *
+     * @param reverse	TRUE to reverse the reaction
+     */
+    public List<String> getParsedFormula(boolean reverse) {
+        List<String> retVal = new ArrayList<String>(2 * this.metabolites.size());
+        // Prime the left side with an empty string.
+        retVal.add("");
+        // Store the left-side metabolites.
+        this.fillParsedFormula(retVal, reverse);
+        // Add the connector.
+        String connector = (this.reversible ? " <-> " : " --> ");
+        retVal.add(connector);
+        // Store the right-side metabolites.
+        this.fillParsedFormula(retVal, ! reverse);
+        // Return the list.
+        return retVal;
+    }
+    /**
+     * Add the metabolites on the current side of the formula.
+     *
+     * @param retVal	output list for the parsed formula
+     * @param products	TRUE to add products, FALSE to add reactants
+     */
+    private void fillParsedFormula(List<String> retVal, boolean products) {
+        // For the first metabolite, we don't need a connector.
+        boolean first = true;
+        // Loop through the metabolites.
+        for (Stoich stoich : this.metabolites) {
+            if (stoich.isProduct() == products) {
+                // Insure we have a preceding connector.
+                if (first)
+                    first = false;
+                else
+                    retVal.add(" + ");
+                int coeff = stoich.getCoeff();
+                if (coeff != 1) {
+                    // We have a non-unit coefficient, so add it to the preceding connector.
+                    int n = retVal.size() - 1;
+                    retVal.set(n, retVal.get(n) + Integer.toString(coeff) + "*");
+                }
+                // Now add the metabolite itself.
+                retVal.add(stoich.biggId);
+            }
+        }
+    }
+
+    /**
      * @return the reaction formula as a string
      *
      * @param reverse	TRUE to reverse the reaction
      */
     public String getFormula(boolean reverse) {
-        // We build the left and right separately and join them at the end.
-        List<String> left = new ArrayList<String>(this.metabolites.size());
-        List<String> right = new ArrayList<String>(this.metabolites.size());
-        for (Stoich stoich : this.metabolites) {
-            int coeff = stoich.getCoeff();
-            String part;
-            if (coeff == 1)
-                part = stoich.getMetabolite();
-            else
-                part = String.format("%d*%s", coeff, stoich.getMetabolite());
-            if (stoich.isProduct() != reverse)
-                right.add(part);
-            else
-                left.add(part);
-        }
-        String connector = (this.reversible ? "<->" : "-->");
-        String retVal = StringUtils.join(left, " + ") + " " + connector + " "
-                + StringUtils.join(right, " + ");
+        List<String> formList = this.getParsedFormula(reverse);
+        String retVal = StringUtils.join(formList, "");
         return retVal;
+    }
+
+    /**
+     * @return the reaction formula as a string with full compound names
+     *
+     * @param reverse	TRUE to reverse the reaction
+     * @param model		parent metabolic model
+     */
+    public String getLongFormula(boolean reverse, MetaModel model) {
+        List<String> formList = this.getParsedFormula(reverse);
+        for (int i = 1; i < formList.size(); i += 2) {
+            String name = "(" + model.getCompoundName(formList.get(i)) + ")";
+            formList.set(i, name);
+        }
+        return StringUtils.join(formList, "");
     }
 
     @Override
