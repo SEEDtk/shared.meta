@@ -1218,4 +1218,10 @@ public class MetaModel {
         this.commons.addAll(newCommons);
     }
 
+    @Override
+    public String toString() {
+        return "MetaModel " + (this.mapName != null ? this.mapName + " for " : "")
+                + (this.baseGenome != null ? this.baseGenome.toString() : " <unknown>");
+    }
+
 }
