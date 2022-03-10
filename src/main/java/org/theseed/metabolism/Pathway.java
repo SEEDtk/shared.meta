@@ -818,11 +818,13 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             workbook.autoSizeColumns();
             workbook.addSheet("Inputs", true);
             // Now list the inputs.
-            workbook.setHeaders(Arrays.asList("metabolite", "needed"));
+            workbook.setHeaders(Arrays.asList("metabolite", "needed", "name"));
             for (CountMap<String>.Count counter : inputCounts.sortedCounts()) {
                 workbook.addRow();
-                workbook.storeCell(counter.getKey());
+                String compound = counter.getKey();
+                workbook.storeCell(compound);
                 workbook.storeCell(counter.getCount());
+                workbook.storeCell(model.getCompoundName(compound));
             }
             workbook.autoSizeColumns();
             // Now we are working with genes, so we need the base genome.
@@ -840,10 +842,10 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
                     workbook.storeCell(input);
                     workbook.storeCell(reaction.getBiggId());
                     workbook.storeCell(reaction.getName());
-                    workbook.storeCell(reaction.getReactionRule());
+                    workbook.storeCell(Reaction.getTranslatedRule(reaction.getReactionRule(), model));
                     // We need to see if the input requires reversing the reaction.
                     boolean reverse = reaction.isProduct(input);
-                    workbook.storeCell(reaction.getFormula(reverse));
+                    workbook.storeCell(reaction.getLongFormula(reverse, model));
                     // Add the triggering genes to the gene set.
                     badGenes.addAll(reaction.getTriggers());
                 }
@@ -896,6 +898,22 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
                 }
             }
         }
+    }
+
+    /**
+     * @return the element preceding the specified one, or NULL if it is the first
+     *
+     * @param element	element of interest
+     */
+    public Element getPrevious(Element element) {
+        Element retVal = null;
+        if (element != this.elements.get(0)) {
+            for (int i = 1; i < this.elements.size() && retVal == null; i++) {
+                if (this.elements.get(i) == element)
+                    retVal = this.elements.get(i-1);
+            }
+        }
+        return retVal;
     }
 
 }
