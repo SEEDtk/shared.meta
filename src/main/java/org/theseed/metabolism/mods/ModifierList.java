@@ -73,6 +73,13 @@ public class ModifierList implements Iterable<Modifier> {
                 return new AvoidPathwayFilter(line);
             }
         },
+        /** allow only certain uncommon cofactors */
+        COFACTORS {
+            @Override
+            public Modifier create(String line) {
+                return new CofactorFilter(line);
+            }
+        },
         /** specify one or more compounds as common */
         COMMONS {
             @Override

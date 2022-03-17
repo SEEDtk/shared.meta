@@ -87,7 +87,7 @@ public class MetaModel {
     /** current list of filters */
     private List<PathwayFilter> filters;
     /** maximum number of successor reactions for a compound to be considered common */
-    private static int MAX_SUCCESSORS = 20;
+    private static int MAX_SUCCESSORS = 40;
     /** maximum pathway length */
     private static int MAX_PATH_LEN = 100;
     /** return value when no reactions found */
@@ -103,6 +103,8 @@ public class MetaModel {
     /** compartment names for compound IDs */
     private static final Map<String, String> COMPARTMENTS = Map.of("c", "", "p", " [periplasm]", "e",
             " [external]");
+    /** maximum number of partial paths to try */
+    private static int MAX_PROC = 50000;
 
     /**
      * This enum is used to manage the JSON keys used by sub-objects of the model.
@@ -879,7 +881,7 @@ public class MetaModel {
         int procCount = 0;
         int keptCount = 0;
         Pathway retVal = null;
-        while (! queue.isEmpty() && retVal == null) {
+        while (! queue.isEmpty() && retVal == null && procCount < MAX_PROC) {
             Pathway path = queue.remove();
             // If we have found our output, we need to check for includes.
             if (path.isComplete()) {
@@ -917,7 +919,7 @@ public class MetaModel {
                 }
             }
             procCount++;
-            if (log.isInfoEnabled() && procCount % 100000 == 0)
+            if (log.isInfoEnabled() && procCount % 10000 == 0)
                 log.info("{} partial paths processed, {} kept.  Stack size = {}.",
                         procCount, keptCount, queue.size());
         }

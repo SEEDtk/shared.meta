@@ -864,4 +864,27 @@ public class Reaction implements Comparable<Reaction> {
 
     }
 
+    /**
+     * This method computes the weight of a reaction.  Reactions are weighted by the sum of the
+     * weights of their inputs (for a branching reaction) or outputs (for a main-line reaction).
+     * Here, the user specifies the weighting hash and whether we are weighting reactants or
+     * products.
+     *
+     * @param	weights		map of compound IDs to ratings
+     * @param	products	TRUE if we are weighting by products, FALSE if by inputs
+     *
+     * @return the total weight of the reaction
+     */
+    public double getWeight(Map<String, CompoundRating> weights, boolean products) {
+        double retVal = 0.0;
+        for (Stoich stoich : this.metabolites) {
+            if (stoich.isProduct() == products) {
+                // Here we have a compound of interest.
+                CompoundRating rating = weights.getOrDefault(stoich.biggId, CompoundRating.IRRELEVANT);
+                retVal += stoich.getCoeff() * rating.getWeight();
+            }
+        }
+        return retVal;
+    }
+
 }

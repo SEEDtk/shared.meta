@@ -1,0 +1,11 @@
+command	parms
+FORWARD	btn_c cbl1_c thmpp_c
+ONEWAY	GHMT2r
+COMMONS	glu__L_c glyc3p_c pep_c accoa_c amet_c akg_c
+COMMONS	udp_c gtp_c adp_c atp_c
+COMMONS	fadh2_c
+COMMONS	h2o2_c h2o_c h2o_p
+COMMONS	glc__D_e ppi_c h_p na1_c pi_c glc__D_p h_c h2_c na1_p coa_c co2_c glc__D_c
+COMMONS	nadh_c nad_c nadph_c nadp_c
+SUPPRESS	GLCt2pp GLCabcpp
+COFACTORS	

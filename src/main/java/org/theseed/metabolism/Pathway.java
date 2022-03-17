@@ -262,6 +262,15 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             this.seqNum = seqNum;
         }
 
+        /**
+         * @return the set of output compounds for this element
+         */
+        public Set<String> getOutputs() {
+            var retVal = reaction.getMetabolites().stream().filter(x -> (x.isProduct() != this.reversed))
+                    .map(x -> x.getMetabolite()).collect(Collectors.toSet());
+            return retVal;
+        }
+
     }
 
     /**
@@ -274,6 +283,55 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             return pathname.getName().endsWith(FILE_EXT);
         }
 
+    }
+
+    /**
+     * This class represents triggering information for the Excel output.
+     */
+    protected static class Trigger implements Comparable<Trigger> {
+
+        /** triggering gene ID */
+        private String bigg;
+        /** target of the trigger */
+        private String target;
+        /** TRUE for a branching trigger, else FALSE */
+        private boolean branch;
+        /** weight of trigger */
+        private double weight;
+
+        /**
+         * Construct a trigger descriptor.
+         *
+         * @param bigg		BiGG ID of the triggering gene
+         * @param target	name of the trigger target (either a compound or a reaction)
+         * @param branch	TRUE for a branching trigger, FALSE for a normal one
+         * @param weight	weight of the trigger; a higher weight indicates more importance
+         */
+        protected Trigger(String bigg, String target, boolean branch, double weight) {
+            this.bigg = bigg;
+            this.target = target;
+            this.branch = branch;
+            this.weight = weight;
+        }
+
+        @Override
+        public int compareTo(Trigger o) {
+            // Float more important triggers to the top.
+            int retVal = Double.compare(o.weight, this.weight);
+            if (retVal == 0) {
+                // Branches are more important than mainline triggers. (Note that FALSE preceeds TRUE.)
+                retVal = Boolean.compare(o.branch, this.branch);
+                if (retVal == 0) {
+                    // Sort by target.
+                    retVal = this.target.compareTo(o.target);
+                    if (retVal == 0) {
+                        // Finally, sort by feature ID.
+                        retVal = this.bigg.compareTo(o.bigg);
+                    }
+                }
+            }
+            return retVal;
+        }
     }
 
     /**
@@ -478,6 +536,18 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
     }
 
     /**
+     * @return an iterator through the tail of the pathway
+     *
+     * @param n		number of reactions to iterate through
+     */
+    public Iterator<Element> tailIterator(int n) {
+        int i2 = this.elements.size();
+        int i1 = i2 - n;
+        if (i1 < 0) i1 = 0;
+        return this.elements.subList(i1, i2).iterator();
+    }
+
+    /**
      * @return the number of segments in this path
      */
     public int size() {
@@ -529,23 +599,28 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             // Get the output compounds for this step and the next step.
             String intermediate = this.elements.get(i).output;
             String next = this.elements.get(i+1).output;
-            // The branch count is the number of successor reactions to this step's
-            // output that do NOT lead to next step's output.
+            // The branches are the successor reactions to this step's
+            // output that do NOT lead to next step's output and are not
+            // reverses of a reaction in the path.
             var reactions = model.getSuccessors(intermediate);
             for (Reaction reaction : reactions) {
-                boolean isBranch = reaction.getOutputs(intermediate).stream()
-                        .allMatch(x -> ! x.getMetabolite().equals(next));
+                boolean isBranch = (reaction.getOutputs(intermediate).stream()
+                        .allMatch(x -> ! x.getMetabolite().equals(next)) &&
+                        ! this.contains(reaction));
                 if (isBranch) {
                     var branchSet = retVal.computeIfAbsent(intermediate, x -> new TreeSet<Reaction>());
                     branchSet.add(reaction);
                 }
             }
         }
-        // Now, finally, we have the branches for the terminus.
+        // Now, finally, we have the branches for the terminus.  We skip it if it is external.  Branching
+        // doesn't make sense for an external compound.
         String terminus = this.getOutput();
-        var reactions = model.getSuccessors(terminus);
-        Set<Reaction> branchSet = retVal.computeIfAbsent(terminus, x -> new TreeSet<Reaction>());
-        branchSet.addAll(reactions);
+        if (! terminus.endsWith("_e")) {
+            var reactions = model.getSuccessors(terminus);
+            Set<Reaction> branchSet = retVal.computeIfAbsent(terminus, x -> new TreeSet<Reaction>());
+            branchSet.addAll(reactions);
+        }
         return retVal;
     }
 
@@ -778,12 +853,18 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      * @param model			underlying metabolic model
      */
     public void saveToExcel(File excelFile, MetaModel model) {
+        // Get the compound ratings.
+        var weightMap = CompoundRating.getRatingMap(this, model);
         // This will collect the triggering genes.
-        Set<String> goodGenes = new TreeSet<String>();
+        var genes = new TreeSet<Trigger>();
         // This will collect the input metabolites.
         CountMap<String> inputCounts = new CountMap<String>();
+        // Get the common compounds.
+        Set<String> commons = model.getCommons();
         // Get the branching reactions.
         var branches = this.getBranches(model);
+        // This will hold the triggering protein ratings.
+        Map<String, ProteinRating> inserts = new HashMap<String, ProteinRating>(this.size() * 5);
         // Each pathway element transmits a direct-line input to an output.
         // The inputs we want to count are the ones not in the direct line.
         // The first direct-line input is the main input.
@@ -791,20 +872,29 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         // Start the pathway report.
         try (CustomWorkbook workbook = CustomWorkbook.create(excelFile)) {
             workbook.addSheet("Pathway", true);
-            workbook.setHeaders(Arrays.asList("reaction", "reaction_name", "rule", "output",
+            workbook.setHeaders(Arrays.asList("reaction", "reaction_name", "triggering_rule", "output",
                     "formula"));
             for (Pathway.Element element : this) {
                 Reaction reaction = element.getReaction();
                 String intermediate = element.getOutput();
                 String rule = reaction.getReactionRule();
+                // Find out if the reaction is reversed.
+                boolean reversed = element.isReversed();
+                // Compute the weight.
+                double weight = reaction.getWeight(weightMap, ! reversed);
+                // Apply the weight to the reaction rule to get the protein weights.
+                String translatedRule = Reaction.getTranslatedRule(rule, model);
+                this.applyWeights(inserts, true, weight, translatedRule);
+                // Add the reaction row.
                 workbook.addRow();
                 workbook.storeCell(reaction.getBiggId());
                 workbook.storeCell(reaction.getName());
-                workbook.storeCell(Reaction.getTranslatedRule(rule, model));
+                workbook.storeCell(translatedRule);
                 workbook.storeCell(element.getOutput());
                 workbook.storeCell(reaction.getLongFormula(element.isReversed(), model));
                 // Add the triggering genes to the gene set.
-                goodGenes.addAll(reaction.getTriggers());
+                reaction.getTriggers().stream()
+                        .forEach(x -> genes.add(new Trigger(x, reaction.getBiggId(), false, weight)));
                 // Get the reaction inputs.
                 var inputs = reaction.getOutputs(intermediate);
                 for (Reaction.Stoich input : inputs) {
@@ -831,55 +921,96 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             Genome baseGenome = model.getBaseGenome();
             // The next sheet is the branch reactions.  For each one we we want to show the input metabolite
             // and the details of the reaction itself.  We also track the triggering genes for the branches.
-            Set<String> badGenes = new TreeSet<String>();
+            Map<String, ProteinRating> deletes = new HashMap<String, ProteinRating>(branches.size() * 5);
             workbook.addSheet("Branches", true);
-            workbook.setHeaders(Arrays.asList("input", "reaction", "reaction_name", "rule",
+            workbook.setHeaders(Arrays.asList("input", "reaction", "reaction_name", "triggering_rule",
                     "formula"));
             for (Map.Entry<String, Set<Reaction>> branchList : branches.entrySet()) {
                 String input = branchList.getKey();
                 for (Reaction reaction : branchList.getValue()) {
-                    workbook.addRow();
-                    workbook.storeCell(input);
-                    workbook.storeCell(reaction.getBiggId());
-                    workbook.storeCell(reaction.getName());
-                    workbook.storeCell(Reaction.getTranslatedRule(reaction.getReactionRule(), model));
-                    // We need to see if the input requires reversing the reaction.
-                    boolean reverse = reaction.isProduct(input);
-                    workbook.storeCell(reaction.getLongFormula(reverse, model));
-                    // Add the triggering genes to the gene set.
-                    badGenes.addAll(reaction.getTriggers());
+                    // Check to see if there is a rule.  If there is no rule, we skip the branch.
+                    String rule = reaction.getReactionRule();
+                    if (! StringUtils.isBlank(rule)) {
+                        // We need to see if the input requires reversing the reaction.
+                        boolean reverse = reaction.isProduct(input);
+                        // From that we compute the weight.
+                        double weight = reaction.getWeight(weightMap, reverse);
+                        String translatedRule = Reaction.getTranslatedRule(rule, model);
+                        // If the compound is uncommon, get the protein weights for the reaction.
+                        if (! commons.contains(input))
+                            this.applyWeights(deletes, false, weight, translatedRule);
+                        // Now create the output row.
+                        workbook.addRow();
+                        workbook.storeCell(input);
+                        workbook.storeCell(reaction.getBiggId());
+                        workbook.storeCell(reaction.getName());
+                        workbook.storeCell(translatedRule);
+                        workbook.storeCell(reaction.getLongFormula(reverse, model));
+                        // Add the triggering genes to the gene set.
+                        reaction.getTriggers().forEach(x -> genes.add(new Trigger(x, input, true, weight)));
+                    }
                 }
             }
             workbook.autoSizeColumns();
-            // Write the triggering gene analysis.
-            workbook.addSheet("Triggers", true);
-            // Finally, we write the triggering genes.  There are good ones that trigger the path, and bad
+            // Write the triggering analysis. There are good ones that trigger the path, and bad
             // ones that bleed off metabolites into other reactions.
-            var aliasMap = baseGenome.getAliasMap();
-            workbook.setHeaders(Arrays.asList("gene", "fid", "aliases", "function", "type"));
-            this.writeGenes(workbook, goodGenes, baseGenome, aliasMap, "trigger");
-            this.writeGenes(workbook, badGenes, baseGenome, aliasMap, "branch");
+            workbook.addSheet("Triggers", true);
+            workbook.setHeaders(Arrays.asList("weight", "gene", "target", "fid", "aliases", "type", "function"));
+            this.writeGenes(workbook, genes, baseGenome);
+            workbook.autoSizeColumns();
+            // Finally, we write the protein analysis.
+            List<ProteinRating> protList = new ArrayList<ProteinRating>(inserts.size() + deletes.size());
+            protList.addAll(inserts.values());
+            protList.addAll(deletes.values());
+            Collections.sort(protList);
+            workbook.addSheet("Genes", true);
+            workbook.setHeaders(Arrays.asList("gene", "weight"));
+            for (ProteinRating rating : protList) {
+                workbook.addRow();
+                workbook.storeCell(rating.getProteinSpec());
+                workbook.storeCell(rating.getWeight());
+            }
             workbook.autoSizeColumns();
         }
 
     }
 
     /**
+     * Apply a reaction's weight to the proteins in its reaction rule.
+     *
+     * @param ratingMap		map of protein IDs to ratings
+     * @param type			TRUE for insert, FALSE for delete
+     * @param weight		weight of the reaction
+     * @param rule			reaction rule string
+     */
+    private void applyWeights(Map<String, ProteinRating> ratingMap, boolean type, double weight, String rule) {
+        ReactionRule parsed = ReactionRule.parse(rule);
+        var weightMap = (type ? parsed.getTriggerWeights() : parsed.getBranchWeights());
+        for (Map.Entry<String, Double> weightEntry : weightMap.entrySet()) {
+            String prot = weightEntry.getKey();
+            ProteinRating rating = ratingMap.computeIfAbsent(prot, x -> new ProteinRating(x, type));
+            rating.add(weightEntry.getValue() * weight);
+        }
+    }
+
+    /**
      * This method will write a set of genes to the triggering worksheet.
      *
      * @param workbook		output workbook
-     * @param genes			set of genes to write
+     * @param genes			sorted set of genes to write
      * @param baseGenome	base genome for the current model
-     * @param aliasMap		alias map for the base genome
-     * @param type			type of gene-- "trigger" or "branch"
      */
-    private void writeGenes(CustomWorkbook workbook, Set<String> genes, Genome baseGenome,
-            Map<String, Set<String>> aliasMap, String type) {
-        for (String gene : genes) {
+    private void writeGenes(CustomWorkbook workbook, Set<Trigger> genes, Genome baseGenome) {
+        var aliasMap = baseGenome.getAliasMap();
+        for (Trigger geneEntry : genes) {
+            double weight = geneEntry.weight;
+            String gene = geneEntry.bigg;
             var fids = aliasMap.get(gene);
             if (fids == null) {
                 workbook.addRow();
+                workbook.storeCell(weight);
                 workbook.storeCell(gene);
+                workbook.storeBlankCell();
                 workbook.storeBlankCell();
                 workbook.storeBlankCell();
                 workbook.storeBlankCell();
@@ -890,11 +1021,13 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
                     Feature feat = baseGenome.getFeature(fid);
                     var aliases = feat.getAliases();
                     String aliasList = StringUtils.join(aliases, ", ");
+                    workbook.storeCell(weight);
                     workbook.storeCell(gene);
+                    workbook.storeCell(geneEntry.target);
                     workbook.storeCell(fid);
                     workbook.storeCell(aliasList);
+                    workbook.storeCell(geneEntry.branch ? "branch" : "trigger");
                     workbook.storeCell(feat.getPegFunction());
-                    workbook.storeCell(type);
                 }
             }
         }
@@ -914,6 +1047,19 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             }
         }
         return retVal;
+    }
+
+    /**
+     * Append the specified path to this one.  This will only work if the input of the
+     * second path is the output of this path.
+     *
+     * @param path2		pathway to append
+     */
+    public void append(Pathway path2) {
+        for (Pathway.Element element : path2) {
+            Reaction react = element.getReaction();
+            this.add(react, react.getStoich(element.getOutput()));
+        }
     }
 
 }
