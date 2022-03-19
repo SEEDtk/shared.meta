@@ -898,12 +898,8 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         var genes = new TreeSet<Trigger>();
         // This will collect the input metabolites.
         CountMap<String> inputCounts = new CountMap<String>();
-        // Get the common compounds.
-        Set<String> commons = model.getCommons();
         // Get the branching reactions.
         var branches = this.getBranches(model);
-        // This will hold the triggering protein ratings.
-        Map<String, ProteinRating> inserts = new HashMap<String, ProteinRating>(this.size() * 5);
         // Each pathway element transmits a direct-line input to an output.
         // The inputs we want to count are the ones not in the direct line.
         // The first direct-line input is the main input.
@@ -921,14 +917,11 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
                 boolean reversed = element.isReversed();
                 // Compute the weight.
                 double weight = reaction.getWeight(weightMap, ! reversed);
-                // Apply the weight to the reaction rule to get the protein weights.
-                String translatedRule = Reaction.getTranslatedRule(rule, model);
-                applyWeights(inserts, true, weight, translatedRule, reaction, reversed, intermediate);
                 // Add the reaction row.
                 workbook.addRow();
                 workbook.storeCell(reaction.getBiggId());
                 workbook.storeCell(reaction.getName());
-                workbook.storeCell(translatedRule);
+                workbook.storeCell(Reaction.getTranslatedRule(rule, model));
                 workbook.storeCell(element.getOutput());
                 workbook.storeCell(reaction.getLongFormula(element.isReversed(), model));
                 // Add the triggering genes to the gene set.
@@ -960,7 +953,6 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             Genome baseGenome = model.getBaseGenome();
             // The next sheet is the branch reactions.  For each one we we want to show the input metabolite
             // and the details of the reaction itself.  We also track the triggering genes for the branches.
-            Map<String, ProteinRating> deletes = new HashMap<String, ProteinRating>(branches.size() * 5);
             workbook.addSheet("Branches", true);
             workbook.setHeaders(Arrays.asList("input", "reaction", "reaction_name", "triggering_rule",
                     "formula"));
@@ -975,9 +967,6 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
                         // From that we compute the weight.
                         double weight = reaction.getWeight(weightMap, reverse);
                         String translatedRule = Reaction.getTranslatedRule(rule, model);
-                        // If the compound is uncommon, get the protein weights for the reaction.
-                        if (! commons.contains(input))
-                            applyWeights(deletes, false, weight, translatedRule, reaction, reverse, input);
                         // Now create the output row.
                         workbook.addRow();
                         workbook.storeCell(input);
@@ -998,10 +987,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             this.writeGenes(workbook, genes, baseGenome);
             workbook.autoSizeColumns();
             // Finally, we write the protein analysis.
-            List<ProteinRating> protList = new ArrayList<ProteinRating>(inserts.size() + deletes.size());
-            protList.addAll(inserts.values());
-            protList.addAll(deletes.values());
-            Collections.sort(protList);
+            List<ProteinRating> protList = this.getProteinRatings(model, weightMap, branches);
             workbook.addSheet("Genes", true);
             workbook.setHeaders(Arrays.asList("gene", "weight", "compound", "reaction"));
             for (ProteinRating rating : protList) {
@@ -1016,6 +1002,57 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             workbook.autoSizeColumns();
         }
 
+    }
+
+    /**
+     * Get the protein ratings for this pathway.  The protein ratings are a sorted list of the
+     * proteins that can be knocked out or promoted to improve the pathway's performance.
+     *
+     * @param model			underlying metabolic model
+     * @param weightMap		map of compound IDs to compound ratings for this pathway
+     * @param branches		map of compounds IDs to branching reactions for this pathway
+     *
+     * @return a sorted list of protein ratings for the pathway
+     */
+    public List<ProteinRating> getProteinRatings(MetaModel model, Map<String, CompoundRating> weightMap,
+            Map<String, Set<Reaction>> branches) {
+        // Get the common compounds.
+        var commons = model.getCommons();
+        // Start with the promotable proteins.
+        Map<String, ProteinRating> inserts = new HashMap<String, ProteinRating>(this.size() * 5);
+        for (Element element : this) {
+            Reaction reaction = element.getReaction();
+            boolean reversed = element.isReversed();
+            double weight = reaction.getWeight(weightMap, reversed);
+            // Apply the weight to the reaction rule to get the protein weights.
+            String translatedRule = Reaction.getTranslatedRule(reaction.getReactionRule(), model);
+            applyWeights(inserts, true, weight, translatedRule, reaction, reversed, element.getOutput());
+        }
+        // Now process the knockout proteins.
+        Map<String, ProteinRating> deletes = new HashMap<String, ProteinRating>(this.size() * 5);
+        for (Map.Entry<String, Set<Reaction>> branchList : branches.entrySet()) {
+            String input = branchList.getKey();
+            for (Reaction reaction : branchList.getValue()) {
+                // Check to see if there is a rule.  If there is no rule, we skip the branch.
+                String rule = reaction.getReactionRule();
+                if (! StringUtils.isBlank(rule)) {
+                    // We need to see if the input requires reversing the reaction.
+                    boolean reverse = reaction.isProduct(input);
+                    // From that we compute the weight.
+                    double weight = reaction.getWeight(weightMap, reverse);
+                    String translatedRule = Reaction.getTranslatedRule(rule, model);
+                    // If the compound is uncommon, get the protein weights for the reaction.
+                    if (! commons.contains(input))
+                        applyWeights(deletes, false, weight, translatedRule, reaction, reverse, input);
+                }
+            }
+        }
+        var retVal = new ArrayList<ProteinRating>(inserts.size() + deletes.size());
+        // Combine and sort the ratings.
+        retVal.addAll(inserts.values());
+        retVal.addAll(deletes.values());
+        Collections.sort(retVal);
+        return retVal;
     }
 
     /**
