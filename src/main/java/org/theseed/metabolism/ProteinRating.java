@@ -3,6 +3,8 @@
  */
 package org.theseed.metabolism;
 
+import java.util.Set;
+
 /**
  * A protein rating estimates the effectiveness of a protein in affecting a pathway.  The protein
  * will be marked as either triggering (should be overexpressed) or branching (should be knocked out).
@@ -16,7 +18,7 @@ package org.theseed.metabolism;
  * @author Bruce Parrello
  *
  */
-public class ProteinRating implements Comparable<ProteinRating> {
+public class ProteinRating implements Comparable<ProteinRating>, IReactionSource {
 
     // FIELDS
     /** ID of the protein */
@@ -25,6 +27,12 @@ public class ProteinRating implements Comparable<ProteinRating> {
     private boolean insert;
     /** accumulated weight */
     private double weight;
+    /** relevant reaction */
+    private Reaction reaction;
+    /** TRUE if the reaction is reversed, else FALSE */
+    private boolean reversed;
+    /** target compound ID */
+    private String target;
 
     /**
      * Create a protein rating.
@@ -36,15 +44,26 @@ public class ProteinRating implements Comparable<ProteinRating> {
         this.proteinId = protein;
         this.insert = triggering;
         this.weight = 0.0;
+        this.reaction = null;
+        this.reversed = false;
+        this.target = null;
     }
 
     /**
-     * Add a weight.
+     * Process a weight.
      *
-     * @param other		weight to add
+     * @param other		weight to process
+     * @param react		relevant reaction
+     * @param reversed	TRUE if the reaction is reversed
+     * @param targetId	target compound ID
      */
-    public void add(double other) {
-        if (other > this.weight) this.weight = other;
+    public void add(double other, Reaction react, boolean reversed, String targetId) {
+        if (other > this.weight) {
+            this.weight = other;
+            this.reaction = react;
+            this.reversed = reversed;
+            this.target = targetId;
+        }
     }
 
     /**
@@ -78,6 +97,34 @@ public class ProteinRating implements Comparable<ProteinRating> {
                 retVal = this.proteinId.compareTo(o.proteinId);
         }
         return retVal;
+    }
+
+    /**
+     * @return the relevant reaction
+     */
+    @Override
+    public Reaction getReaction() {
+        return this.reaction;
+    }
+
+    /**
+     * @return the target compound ID
+     */
+    public String getTarget() {
+        return this.target;
+    }
+
+    /**
+     * @return TRUE if the relevant reaction is reversed
+     */
+    @Override
+    public boolean isReversed() {
+        return this.reversed;
+    }
+
+    @Override
+    public Set<String> getSpecial() {
+        return Set.of(this.target);
     }
 
 }

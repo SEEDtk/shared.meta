@@ -90,7 +90,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      * This represents a single reaction element of the pathway.  Elements are sorted by reaction ID, then
      * output metabolite, and finally with unreversed before reversed.
      */
-    public static class Element implements Comparable<Element> {
+    public class Element implements Comparable<Element>, IReactionSource {
 
         /** TRUE if the reaction is reversed */
         private boolean reversed;
@@ -112,6 +112,21 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             this.reaction = reaction;
             this.output = node.getMetabolite();
             this.reversed = ! node.isProduct();
+            this.seqNum = num;
+        }
+
+        /**
+         * Create a new element for a pathway.
+         *
+         * @param reaction	reaction to use
+         * @param compound	desired output compound
+         * @param reverse	TRUE if the reaction should be reversed
+         * @param num 		sequence number of reaction
+         */
+        private Element(Reaction reaction, String compound, boolean reverse, int num) {
+            this.reaction = reaction;
+            this.output = compound;
+            this.reversed = reverse;
             this.seqNum = num;
         }
 
@@ -154,6 +169,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         /**
          * @return TRUE if the reaction is reversed
          */
+        @Override
         public boolean isReversed() {
             return this.reversed;
         }
@@ -168,6 +184,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         /**
          * @return the reaction
          */
+        @Override
         public Reaction getReaction() {
             return this.reaction;
         }
@@ -178,6 +195,17 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         public Set<String> getInputs() {
             Collection<Reaction.Stoich> inputNodes = this.reaction.getOutputs(this.output);
             Set<String> retVal = inputNodes.stream().map(x -> x.getMetabolite()).collect(Collectors.toSet());
+            return retVal;
+        }
+
+        /**
+         * @return the previous element's output, or NULL if this is the first element
+         */
+        public String getMainInput() {
+            int idx = Pathway.this.elements.indexOf(this);
+            String retVal = null;
+            if (idx > 0)
+                retVal = Pathway.this.elements.get(idx - 1).output;
             return retVal;
         }
 
@@ -268,6 +296,17 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
         public Set<String> getOutputs() {
             var retVal = reaction.getMetabolites().stream().filter(x -> (x.isProduct() != this.reversed))
                     .map(x -> x.getMetabolite()).collect(Collectors.toSet());
+            return retVal;
+        }
+
+        @Override
+        public Set<String> getSpecial() {
+            // For a pathway element, the input and output are special.
+            var retVal = new TreeSet<String>();
+            String input = this.getMainInput();
+            if (input != null)
+                retVal.add(input);
+            retVal.add(this.output);
             return retVal;
         }
 
@@ -884,7 +923,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
                 double weight = reaction.getWeight(weightMap, ! reversed);
                 // Apply the weight to the reaction rule to get the protein weights.
                 String translatedRule = Reaction.getTranslatedRule(rule, model);
-                this.applyWeights(inserts, true, weight, translatedRule);
+                applyWeights(inserts, true, weight, translatedRule, reaction, reversed, intermediate);
                 // Add the reaction row.
                 workbook.addRow();
                 workbook.storeCell(reaction.getBiggId());
@@ -938,7 +977,7 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
                         String translatedRule = Reaction.getTranslatedRule(rule, model);
                         // If the compound is uncommon, get the protein weights for the reaction.
                         if (! commons.contains(input))
-                            this.applyWeights(deletes, false, weight, translatedRule);
+                            applyWeights(deletes, false, weight, translatedRule, reaction, reverse, input);
                         // Now create the output row.
                         workbook.addRow();
                         workbook.storeCell(input);
@@ -964,11 +1003,15 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             protList.addAll(deletes.values());
             Collections.sort(protList);
             workbook.addSheet("Genes", true);
-            workbook.setHeaders(Arrays.asList("gene", "weight"));
+            workbook.setHeaders(Arrays.asList("gene", "weight", "compound", "reaction"));
             for (ProteinRating rating : protList) {
                 workbook.addRow();
                 workbook.storeCell(rating.getProteinSpec());
                 workbook.storeCell(rating.getWeight());
+                String compound = model.getCompoundName(rating.getTarget());
+                workbook.storeCell(compound);
+                String formula = rating.getReaction().getLongFormula(rating.isReversed(), model);
+                workbook.storeCell(formula);
             }
             workbook.autoSizeColumns();
         }
@@ -982,14 +1025,18 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
      * @param type			TRUE for insert, FALSE for delete
      * @param weight		weight of the reaction
      * @param rule			reaction rule string
+     * @param reaction		target reaction
+     * @param reverse 		TRUE if the reaction is reversed
+     * @param compound		ID of the relevant compound
      */
-    private void applyWeights(Map<String, ProteinRating> ratingMap, boolean type, double weight, String rule) {
+    public static void applyWeights(Map<String, ProteinRating> ratingMap, boolean type, double weight, String rule,
+            Reaction reaction, boolean reverse, String compound) {
         ReactionRule parsed = ReactionRule.parse(rule);
         var weightMap = (type ? parsed.getTriggerWeights() : parsed.getBranchWeights());
         for (Map.Entry<String, Double> weightEntry : weightMap.entrySet()) {
             String prot = weightEntry.getKey();
             ProteinRating rating = ratingMap.computeIfAbsent(prot, x -> new ProteinRating(x, type));
-            rating.add(weightEntry.getValue() * weight);
+            rating.add(weightEntry.getValue() * weight, reaction, reverse, compound);
         }
     }
 
@@ -1060,6 +1107,19 @@ public class Pathway implements Iterable<Pathway.Element>, Comparable<Pathway> {
             Reaction react = element.getReaction();
             this.add(react, react.getStoich(element.getOutput()));
         }
+    }
+
+    /**
+     * Add the specified reaction to this pathway.
+     *
+     * @param reaction		reaction to add
+     * @param compoundId	proposed output compound
+     * @param reverse		TRUE to reverse the reaction
+     */
+    public void add(Reaction reaction, String compoundId, boolean reverse) {
+        int num = this.elements.size() + 1;
+        Element element = new Element(reaction, compoundId, reverse, num);
+        this.elements.add(element);
     }
 
 }
