@@ -29,6 +29,8 @@ import org.slf4j.LoggerFactory;
 import org.theseed.genome.Genome;
 import org.theseed.metabolism.Reaction.ActiveDirections;
 import org.theseed.metabolism.mods.PathwayFilter;
+import org.theseed.shared.meta.IProgressReporter;
+import org.theseed.shared.meta.LogProgressReporter;
 
 import com.github.cliftonlabs.json_simple.JsonArray;
 import com.github.cliftonlabs.json_simple.JsonException;
@@ -86,6 +88,10 @@ public class MetaModel {
     private Set<String> commons;
     /** current list of filters */
     private List<PathwayFilter> filters;
+    /** progress reporter for searches */
+    private IProgressReporter progReports;
+    /** default progress reporter */
+    private static IProgressReporter LOG_REPORTER = new LogProgressReporter();
     /** maximum number of successor reactions for a compound to be considered common */
     private static int MAX_SUCCESSORS = 40;
     /** maximum pathway length */
@@ -330,6 +336,8 @@ public class MetaModel {
      * @param modelJson		JSON representation of the model
      */
     private void setupModel(Genome genome, JsonArray modelJson) {
+        // Default the progress reporter.
+        this.progReports = LOG_REPORTER;
         // Save the base genome.
         this.baseGenome = genome;
         // Denote no IDs have been used.
@@ -400,6 +408,15 @@ public class MetaModel {
         // Start with the default commons and no filters.
         this.commons = new HashSet<String>(DEFAULT_COMMONS);
         this.filters = new ArrayList<PathwayFilter>();
+    }
+
+    /**
+     * Specify a new progress reporter.
+     *
+     * @param reporter		new reporter for showing progress
+     */
+    public void setReporter(IProgressReporter reporter) {
+        this.progReports = reporter;
     }
 
     /**
@@ -877,9 +894,10 @@ public class MetaModel {
         PriorityQueue<Pathway> queue = new PriorityQueue<Pathway>(100, cmp);
         // Fill the queue with the initial pathways.
         queue.addAll(initial);
-        // Now process the queue until it is empty.
         int procCount = 0;
         int keptCount = 0;
+        this.progReports.showProgress(0.0);
+        // Now process the queue until it is empty.
         Pathway retVal = null;
         while (! queue.isEmpty() && retVal == null && procCount < MAX_PROC) {
             Pathway path = queue.remove();
@@ -919,6 +937,7 @@ public class MetaModel {
                 }
             }
             procCount++;
+            this.progReports.showProgress(procCount / (double) queue.size());
             if (log.isInfoEnabled() && procCount % 10000 == 0)
                 log.info("{} partial paths processed, {} kept.  Stack size = {}.",
                         procCount, keptCount, queue.size());
