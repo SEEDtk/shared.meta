@@ -4,6 +4,7 @@
 package org.theseed.metabolism;
 
 import org.junit.jupiter.api.Test;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Genome;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.metabolism.Reaction.ActiveDirections;
@@ -12,7 +13,6 @@ import org.theseed.metabolism.mods.ForwardOnlyModifier;
 import org.theseed.metabolism.mods.IncludePathwayFilter;
 import org.theseed.metabolism.mods.ModifierList;
 import org.theseed.metabolism.mods.ReactionFlowModifier;
-import org.theseed.utils.ParseFailureException;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;

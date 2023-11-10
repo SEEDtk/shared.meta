@@ -3,9 +3,9 @@
  */
 package org.theseed.metabolism.mods;
 
+import org.theseed.basic.ParseFailureException;
 import org.theseed.metabolism.MetaModel;
 import org.theseed.metabolism.Pathway;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * A pathway filter contains various criteria for a pathway.  The basic pathway

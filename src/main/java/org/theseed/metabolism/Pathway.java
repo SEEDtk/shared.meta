@@ -23,11 +23,11 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.counters.CountMap;
 import org.theseed.excel.CustomWorkbook;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
-import org.theseed.utils.ParseFailureException;
 
 import com.github.cliftonlabs.json_simple.JsonArray;
 import com.github.cliftonlabs.json_simple.JsonException;

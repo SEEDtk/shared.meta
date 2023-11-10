@@ -13,10 +13,10 @@ import java.util.stream.Collectors;
 import javax.xml.stream.XMLStreamException;
 
 import org.junit.jupiter.api.Test;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Genome;
 import org.theseed.metabolism.mods.AvoidPathwayFilter;
 import org.theseed.metabolism.mods.IncludePathwayFilter;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * @author Bruce Parrello

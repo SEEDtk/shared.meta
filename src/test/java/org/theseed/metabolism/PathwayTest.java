@@ -12,9 +12,9 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Genome;
 import org.theseed.metabolism.mods.ModifierList;
-import org.theseed.utils.ParseFailureException;
 
 import com.github.cliftonlabs.json_simple.JsonException;
 

@@ -9,9 +9,9 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.theseed.metabolism.Reaction;
-import org.theseed.utils.ParseFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.metabolism.MetaModel;
 
 /**
